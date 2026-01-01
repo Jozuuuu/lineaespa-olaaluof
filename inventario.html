@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Inventario - Sistema de Bodega</title>
+    <style>
+        body{font-family:Arial,Helvetica,sans-serif;background:#f2f2f2;padding:16px}
+        .container{background:#fff;padding:16px;border-radius:8px;margin-bottom:12px}
+        .header{display:flex;gap:12px;align-items:center}
+        .header b{font-size:1.05em}
+        .controls{display:flex;gap:8px;align-items:center;margin:12px 0}
+        .controls input{flex:1;padding:8px}
+        #formArea{border:1px solid #e0e0e0;padding:10px;border-radius:6px;background:#fafafa}
+        table{width:100%;border-collapse:collapse;margin-top:8px}
+        th,td{border:1px solid #ddd;padding:8px;text-align:left}
+        th{background:#f7f7f7}
+        .actions button{margin-right:6px}
+        .hidden{display:none}
+        .admin-panel{background:#fff3cd;padding:10px;border-radius:6px}
+        @media(min-width:800px){ .controls input{flex:1} }
+    </style>
+</head>
+<body>
+
+    <h1>📦 Inventario (simple)</h1>
+
+    <div class="container">
+        <div style="display:flex;gap:8px;align-items:center">
+            <div>Usuario: <b id="usuarioActivo">-</b></div>
+            <button id="btnLogout" style="margin-left:8px">Cerrar sesión</button>
+        </div>
+
+        <hr>
+
+        <div class="controls">
+            <label style="white-space:nowrap">Categoría:</label>
+            <select id="categoriaSel">
+                <option value="todas">Todas</option>
+                <option value="vidrio">Vidrio</option>
+                <option value="aluminio">Aluminio</option>
+                <option value="herrajes">Herrajes</option>
+                <option value="insumos">Insumos</option>
+            </select>
+            <input id="busqueda" placeholder="Buscar...">
+            <label style="white-space:nowrap">Filtrar campo:</label>
+            <select id="filterField">
+                <option value="Todos">Todos</option>
+            </select>
+            <button id="btnAdvancedSearch">Búsqueda avanzada</button>
+            <button id="btnNew">Agregar producto nuevo</button>
+        </div>
+
+        <div id="formArea" class="hidden"></div>
+        <div id="tablesArea"></div>
+
+        <!-- Advanced search modal -->
+        <div id="searchMenu" class="hidden" style="position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:#fff;padding:12px;border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,0.2);max-width:90%;width:600px;z-index:999">
+            <h3>Búsqueda avanzada</h3>
+            <div id="searchSteps"></div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+                <button id="applySearch">Aplicar</button>
+                <button id="cancelSearch">Cancelar</button>
+            </div>
+        </div>
+
+        <div id="adminPanel" class="container hidden admin-panel">
+            <h3>👑 Panel Administrador</h3>
+            <div style="display:flex;gap:12px;flex-wrap:wrap">
+                <div style="flex:1;min-width:280px">
+                    <h4>Usuarios</h4>
+                    <table id="tablaUsuariosAdmin"><thead><tr><th>Usuario</th><th>Estado</th><th>Acción</th></tr></thead><tbody></tbody></table>
+                </div>
+                <div style="flex:1;min-width:280px">
+                    <h4>Bitácora</h4>
+                    <button id="exportLogCSV">Exportar bitácora (CSV)</button>
+                    <table id="tablaLogAdmin"><thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th></tr></thead><tbody></tbody></table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+    // --- Data load ---
+    const usuarioActivoEl = document.getElementById('usuarioActivo');
+    const btnLogout = document.getElementById('btnLogout');
+    const categoriaSel = document.getElementById('categoriaSel');
+    const busqueda = document.getElementById('busqueda');
+    const formArea = document.getElementById('formArea');
+    const tablesArea = document.getElementById('tablesArea');
+    const btnNew = document.getElementById('btnNew');
+    const btnAdvancedSearch = document.getElementById('btnAdvancedSearch');
+    const searchMenu = document.getElementById('searchMenu');
+    const searchSteps = document.getElementById('searchSteps');
+    const applySearchBtn = document.getElementById('applySearch');
+    const cancelSearchBtn = document.getElementById('cancelSearch');
+    const adminPanel = document.getElementById('adminPanel');
+
+    let inventory = JSON.parse(localStorage.getItem('inventory_v1')) || {vidrio:[],aluminio:[],herrajes:[],insumos:[]};
+    // server sync flag
+    let serverAvailable = false;
+    let socket = null;
+
+    // try to detect server
+    (async function detectServer(){
+        try{
+            const res = await fetch('/api/ping');
+            if(res.ok){ serverAvailable = true; console.log('Server detected');
+                // fetch server inventory and use it
+                const invRes = await fetch('/api/inventory');
+                if(invRes.ok){ inventory = await invRes.json(); localStorage.setItem('inventory_v1', JSON.stringify(inventory)); }
+                // connect socket
+                try{ socket = io(); socket.on('inventory-updated', data=>{ inventory = data; localStorage.setItem('inventory_v1', JSON.stringify(inventory)); renderTable(categoriaSel.value, busqueda.value); }); }catch(e){ console.warn('socket connect failed',e); }
+            }
+        }catch(e){ console.log('No server detected, working offline'); }
+    })();
+    // migrate legacy 'medida' -> 'medida1'/'medida2' for vidrio items
+    if(inventory && inventory.vidrio && Array.isArray(inventory.vidrio)){
+        inventory.vidrio.forEach(it=>{
+            if(it && !it.medida1 && it.medida){
+                const parts = it.medida.split(/x|×|,|;/i).map(s=>s.trim()).filter(Boolean);
+                it.medida1 = parts[0] || it.medida || '';
+                it.medida2 = parts[1] || '';
+            }
+        });
+        // persist migration
+        localStorage.setItem('inventory_v1', JSON.stringify(inventory));
+    }
+    let usuarios = JSON.parse(localStorage.getItem('usuarios')) || {};
+    let log = JSON.parse(localStorage.getItem('log')) || [];
+    let activo = localStorage.getItem('activo') || null;
+
+    async function saveInventory(){
+        localStorage.setItem('inventory_v1', JSON.stringify(inventory));
+        if(serverAvailable){
+            try{
+                await fetch('/api/inventory', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(inventory) });
+                console.log('Inventory synced to server');
+            }catch(e){ console.warn('Sync to server failed, keeping local copy',e); try{ autoExport(); }catch(e2){} }
+        } else {
+            try{ autoExport(); }catch(e){ console.warn('Auto-export falló',e); }
+        }
+    }
+    function saveUsers(){ localStorage.setItem('usuarios', JSON.stringify(usuarios)); }
+    function saveLog(){ localStorage.setItem('log', JSON.stringify(log)); }
+
+    // Auto-export current data: inventory JSON, usuarios TXT, log CSV
+    function autoExport(){
+        const ts = new Date();
+        const pad = n=> n.toString().padStart(2,'0');
+        const nameBase = `export_${ts.getFullYear()}${pad(ts.getMonth()+1)}${pad(ts.getDate())}_${pad(ts.getHours())}${pad(ts.getMinutes())}${pad(ts.getSeconds())}`;
+        // inventory JSON
+        const invBlob = new Blob([JSON.stringify(inventory, null, 2)], {type:'application/json'});
+        const a1 = document.createElement('a'); a1.href=URL.createObjectURL(invBlob); a1.download = nameBase + '_inventory.json'; a1.style.display='none'; document.body.appendChild(a1); a1.click(); a1.remove();
+        // usuarios TXT
+        try{
+            const lines = [];
+            for(const u in usuarios){ lines.push(`${u},${usuarios[u].pass},${usuarios[u].autorizado}`); }
+            const uBlob = new Blob([lines.join('\n')], {type:'text/plain'});
+            const a2 = document.createElement('a'); a2.href=URL.createObjectURL(uBlob); a2.download = nameBase + '_usuarios.txt'; a2.style.display='none'; document.body.appendChild(a2); a2.click(); a2.remove();
+        }catch(e){ console.warn('Export usuarios falló',e); }
+        // log CSV
+        try{
+            let csv = 'Fecha,Usuario,Accion\n';
+            log.forEach(l=> csv += `${l.fecha.replace(/,/g,' ')} , ${l.usuario} , ${l.accion.replace(/,/g,' ')}\n`);
+            const lBlob = new Blob([csv], {type:'text/csv'});
+            const a3 = document.createElement('a'); a3.href=URL.createObjectURL(lBlob); a3.download = nameBase + '_log.csv'; a3.style.display='none'; document.body.appendChild(a3); a3.click(); a3.remove();
+        }catch(e){ console.warn('Export log falló',e); }
+        console.log('Auto-export completed', nameBase);
+    }
+    function makeId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+
+    const templates = {
+        vidrio: ['image','tipo','color','grosor','forma','medida1','medida2','cantidad'],
+        aluminio: ['image','linea','serie','nombre','color','codigo','cantidad'],
+        herrajes: ['image','nombre','color','codigo','cantidad'],
+        insumos: ['image','nombre','tipo','color','codigo','cantidad']
+    };
+
+    // helper: all categories list
+    const allCategories = Object.keys(templates);
+
+    // Populate filterField options based on selected category (or all)
+    const filterField = document.getElementById('filterField');
+    function populateFilterOptions(selectedCat){
+        const opts = new Set();
+        opts.add('Todos');
+        opts.add('categoria');
+        if(!selectedCat || selectedCat==='todas'){
+            allCategories.forEach(cat=> templates[cat].forEach(f=>opts.add(f)));
+        }else if(templates[selectedCat]){
+            templates[selectedCat].forEach(f=>opts.add(f));
+        }
+        // clear and append
+        filterField.innerHTML = '';
+        Array.from(opts).forEach(o=>{
+            const op = document.createElement('option'); op.value = o; op.innerText = o=== 'Todos' ? 'Todos (buscar en todos los campos)' : o;
+            filterField.appendChild(op);
+        });
+    }
+
+    // --- Advanced search UI ---
+    function openAdvancedSearch(){
+        searchSteps.innerHTML = '';
+        searchMenu.classList.remove('hidden');
+        // Step 1: choose category (or 'todas' -> then choose specific)
+        const step1 = document.createElement('div'); step1.style.marginBottom='8px';
+        const lbl1 = document.createElement('label'); lbl1.innerText='Paso 1: Seleccione categoría:'; step1.appendChild(lbl1);
+        const sel1 = document.createElement('select'); sel1.style.width='100%';
+        const opAll = document.createElement('option'); opAll.value='todas'; opAll.innerText='Todas'; sel1.appendChild(opAll);
+        allCategories.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.innerText=c; sel1.appendChild(o); });
+        sel1.value = categoriaSel.value || 'todas';
+        step1.appendChild(sel1); searchSteps.appendChild(step1);
+
+        // placeholder for step 2 (fields)
+        const step2 = document.createElement('div'); step2.id='searchStepFields'; searchSteps.appendChild(step2);
+
+        function handleCatChange(){
+            const cat = sel1.value;
+            buildFieldSelectors(cat);
+        }
+        sel1.addEventListener('change', handleCatChange);
+        // initial build
+        buildFieldSelectors(sel1.value);
+    }
+
+    function buildFieldSelectors(cat){
+        const container = document.getElementById('searchStepFields'); container.innerHTML='';
+        if(cat==='todas'){
+            // ask user to pick one category to filter fields
+            const p = document.createElement('div'); const lbl = document.createElement('label'); lbl.innerText='Seleccione una categoría para definir los campos:'; p.appendChild(lbl);
+            const sel = document.createElement('select'); sel.style.width='100%'; allCategories.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.innerText=c; sel.appendChild(o); });
+            p.appendChild(sel); container.appendChild(p);
+            sel.addEventListener('change', ()=> buildFieldSelectors(sel.value));
+            return;
+        }
+        // Step: for each field in templates[cat], create dropdown of unique values + 'Cualquiera' + 'Personalizado'
+        const fields = templates[cat] || [];
+        fields.forEach(fieldName=>{
+            const row = document.createElement('div'); row.style.marginBottom='6px';
+            const lbl = document.createElement('label'); lbl.innerText = `Campo: ${fieldName}`; row.appendChild(lbl);
+            const sel = document.createElement('select'); sel.style.width='100%'; sel.dataset.field = fieldName;
+            const any = document.createElement('option'); any.value='__ANY__'; any.innerText='Cualquiera'; sel.appendChild(any);
+            const custom = document.createElement('option'); custom.value='__CUSTOM__'; custom.innerText='Personalizado...'; sel.appendChild(custom);
+            // collect unique values from inventory
+            const values = new Set(); (inventory[cat]||[]).forEach(it=>{ const v = it[fieldName]; if(v!==undefined && v!==null && v!=='' ) values.add(v.toString()); });
+            Array.from(values).sort().forEach(v=>{ const o=document.createElement('option'); o.value=v; o.innerText=v; sel.appendChild(o); });
+            row.appendChild(sel);
+            // custom input (hidden)
+            const inp = document.createElement('input'); inp.style.display='none'; inp.placeholder='Valor personalizado'; inp.style.width='100%'; inp.dataset.field = fieldName;
+            sel.addEventListener('change', ()=>{ if(sel.value==='__CUSTOM__') inp.style.display='block'; else inp.style.display='none'; });
+            row.appendChild(inp);
+            container.appendChild(row);
+        });
+    }
+
+    function applyAdvancedSearch(){
+        // read chosen category (first select in searchSteps)
+        const selCat = searchSteps.querySelector('select');
+        if(!selCat) return;
+        let chosenCat = selCat.value;
+        // if chosenCat is 'todas' and there's a second select to pick category, use it
+        const stepFields = document.getElementById('searchStepFields');
+        const innerSelect = stepFields.querySelector('select');
+        if(chosenCat==='todas' && innerSelect && innerSelect.dataset.field===undefined){
+            // this inner select is the one to choose a category
+            chosenCat = innerSelect.value;
+        }
+        // gather criteria
+        const criteria = { category: chosenCat, conditions: {} };
+        const selects = stepFields.querySelectorAll('select');
+        selects.forEach(s=>{
+            const f = s.dataset.field;
+            if(!f) return; // skip category chooser
+            if(s.value && s.value!=='__ANY__'){
+                if(s.value==='__CUSTOM__'){
+                    const inp = stepFields.querySelector(`input[data-field="${f}"]`);
+                    if(inp && inp.value.trim()!=='') criteria.conditions[f]=inp.value.trim();
+                } else {
+                    criteria.conditions[f]=s.value;
+                }
+            }
+        });
+        // hide modal
+        searchMenu.classList.add('hidden');
+        // render results using criteria
+        renderTableWithCriteria(criteria);
+    }
+
+    function cancelSearch(){ searchMenu.classList.add('hidden'); }
+
+    // Render using advanced criteria object {category, conditions}
+    function renderTableWithCriteria(criteria){
+        if(!criteria || !criteria.category) return;
+        const cat = criteria.category;
+        tablesArea.innerHTML='';
+        const renderCategory = (c)=>{
+            if(!templates[c]) return;
+            const cont = document.createElement('div'); cont.className='container';
+            const h = document.createElement('h3'); h.innerText = c.toUpperCase(); cont.appendChild(h);
+            const tbl = document.createElement('table');
+            const thead = document.createElement('thead'); const hr = document.createElement('tr');
+            templates[c].forEach(col=>{ const th=document.createElement('th'); th.innerText=col.toUpperCase(); hr.appendChild(th); });
+            const tha = document.createElement('th'); tha.innerText='ACCIONES'; hr.appendChild(tha); thead.appendChild(hr); tbl.appendChild(thead);
+            const tbody = document.createElement('tbody');
+            (inventory[c]||[]).forEach(item=>{
+                try{
+                    let ok=true;
+                    for(const f in criteria.conditions){
+                        const want = criteria.conditions[f].toString().toLowerCase();
+                        const have = (item[f]||'').toString().toLowerCase();
+                        if(!have.includes(want)){ ok=false; break; }
+                    }
+                    if(!ok) return;
+                    const tr = document.createElement('tr');
+                    templates[c].forEach(key=>{
+                        const td = document.createElement('td');
+                        if(key==='image'){
+                            if(item.imageData){ const img=document.createElement('img'); img.src=item.imageData; img.style.height='40px'; td.appendChild(img); }
+                            else if(item.imageName) td.innerText = item.imageName; else td.innerText = '-';
+                        } else td.innerText = item[key] || '';
+                        tr.appendChild(td);
+                    });
+                    const tdA = document.createElement('td'); tdA.className='actions';
+                    const inBtn = document.createElement('button'); inBtn.innerText='Entrada'; inBtn.addEventListener('click', ()=>{ try{ const q=parseInt(prompt('Cantidad a agregar')||0); if(!q) return; item.cantidad=(parseInt(item.cantidad)||0)+q; saveInventory(); renderTableWithCriteria(criteria); }catch(e){ console.error('Entrada error',e); alert('Error en entrada (ver consola)'); } });
+                    const outBtn = document.createElement('button'); outBtn.innerText='Salida'; outBtn.addEventListener('click', ()=>{ try{ const q=parseInt(prompt('Cantidad a retirar')||0); if(!q) return; if((item.cantidad||0)<q) return alert('Stock insuficiente'); item.cantidad=(parseInt(item.cantidad)||0)-q; saveInventory(); renderTableWithCriteria(criteria); }catch(e){ console.error('Salida error',e); alert('Error en salida (ver consola)'); } });
+                    const delBtn = document.createElement('button'); delBtn.innerText='Eliminar'; delBtn.addEventListener('click', ()=>{ try{ if(!confirm('Eliminar producto?')) return; inventory[c]=inventory[c].filter(x=>x.id!==item.id); saveInventory(); renderTableWithCriteria(criteria); }catch(e){ console.error('Eliminar error',e); alert('Error al eliminar (ver consola)'); } });
+                    tdA.appendChild(inBtn); tdA.appendChild(outBtn); tdA.appendChild(delBtn); tr.appendChild(tdA);
+                    tbody.appendChild(tr);
+                }catch(err){ console.error('Error renderTableWithCriteria item',item,err); }
+            });
+            tbl.appendChild(tbody); cont.appendChild(tbl); tablesArea.appendChild(cont);
+        };
+        renderCategory(cat);
+    }
+
+    // --- Form (appears only on Add) ---
+    function renderForm(cat){
+        console.log('renderForm start',cat);
+        cat = cat || (categoriaSel? categoriaSel.value : null);
+        if(!cat){ console.error('renderForm: categoría no definida'); return; }
+        if(!templates[cat]){ console.error('renderForm: plantilla no encontrada para',cat); alert('Categoría inválida'); return; }
+        formArea.innerHTML = '';
+        formArea.classList.remove('hidden');
+        const fields = templates[cat];
+        const wrapper = document.createElement('div'); wrapper.style.display='flex'; wrapper.style.gap='8px'; wrapper.style.flexWrap='wrap';
+        const inputs = {};
+        fields.forEach(k=>{
+            const col = document.createElement('div'); col.style.display='flex'; col.style.flexDirection='column'; col.style.minWidth='140px';
+            const label = document.createElement('label'); label.innerText = k.toUpperCase();
+            col.appendChild(label);
+            // For images keep file input
+            if(k==='image'){
+                const inp = document.createElement('input'); inp.type='file'; inp.accept='image/*'; col.appendChild(inp); inputs[k]=inp;
+            } else if(k==='cantidad'){
+                const inp = document.createElement('input'); inp.type='number'; inp.min='0'; inp.value='0'; col.appendChild(inp); inputs[k]=inp;
+            } else {
+                // create select populated with unique existing values for this field in this category
+                const sel = document.createElement('select'); sel.style.width='100%';
+                const any = document.createElement('option'); any.value='__ANY__'; any.innerText='-- seleccionar sugerencia --'; sel.appendChild(any);
+                const other = document.createElement('option'); other.value='__OTHER__'; other.innerText='Personalizado...'; sel.appendChild(other);
+                // collect unique values
+                const vals = new Set(); (inventory[cat]||[]).forEach(it=>{ const v = it[k]; if(v!==undefined && v!==null && v!=='') vals.add(v.toString()); });
+                Array.from(vals).sort().forEach(v=>{ const o=document.createElement('option'); o.value=v; o.innerText=v; sel.appendChild(o); });
+                const txt = document.createElement('input'); txt.type='text'; txt.placeholder='Valor personalizado'; txt.style.display='none'; txt.style.marginTop='6px';
+                sel.addEventListener('change', ()=>{ if(sel.value==='__OTHER__') txt.style.display='block'; else txt.style.display='none'; });
+                col.appendChild(sel); col.appendChild(txt); inputs[k]={ select: sel, other: txt };
+            }
+            // append column wrapper for every field
+            wrapper.appendChild(col);
+        });
+        const btns = document.createElement('div'); btns.style.width='100%'; btns.style.marginTop='8px';
+        const save = document.createElement('button'); save.innerText='Guardar'; save.onclick = ()=>{
+            try{
+                const data = {id: makeId()};
+                let pendingFile = false;
+                    function finalize(){
+                    const arr = inventory[cat];
+                    let dup = -1;
+                    arr.forEach((it,i)=>{
+                        if(cat==='vidrio'){
+                            if(it.tipo===data.tipo && it.color===data.color && it.grosor===data.grosor && it.forma===data.forma && it.medida1===data.medida1 && it.medida2===data.medida2) dup=i;
+                        }else if(cat==='aluminio'){
+                            if(it.linea===data.linea && it.serie===data.serie && it.nombre===data.nombre && it.codigo===data.codigo) dup=i;
+                        }else if(cat==='herrajes'){
+                            if(it.nombre===data.nombre && it.codigo===data.codigo) dup=i;
+                        }else if(cat==='insumos'){
+                            if(it.nombre===data.nombre && it.tipo===data.tipo && it.codigo===data.codigo) dup=i;
+                        }
+                    });
+                    if(dup>=0){ arr[dup].cantidad = (parseInt(arr[dup].cantidad)||0) + (parseInt(data.cantidad)||0); alert('Duplicado: cantidad sumada.'); }
+                    else { arr.push(data); alert('Producto agregado.'); }
+                    // if server available, send item to server (including possible imagePath handled earlier)
+                    if(serverAvailable){
+                        try{
+                            // POST /api/item with formdata
+                            const form = new FormData();
+                            form.append('category', cat);
+                            form.append('item', JSON.stringify(data));
+                            // if imageFile present in inputs, attach
+                            if(data._imageFile){ form.append('image', data._imageFile); delete data._imageFile; }
+                            fetch('/api/item', { method:'POST', body: form }).then(r=>r.json()).then(j=>{ if(j.inventory){ inventory = j.inventory; localStorage.setItem('inventory_v1', JSON.stringify(inventory)); renderTable(categoriaSel.value, busqueda.value); } }).catch(e=>{ console.warn('Enviar item al servidor falló',e); saveInventory(); renderTable(cat, busqueda.value); });
+                    } else {
+                        saveInventory(); renderTable(cat, busqueda.value);
+                    }
+                    formArea.classList.add('hidden');
+                }
+                fields.forEach(k=>{
+                    if(k==='image'){
+                        const f = inputs[k] && inputs[k].files && inputs[k].files[0];
+                        if(f){
+                            // attach file for server upload path; keep fallback dataURL
+                            if(serverAvailable){ data._imageFile = f; pendingFile = false; }
+                            else { pendingFile = true; const reader = new FileReader(); reader.onload = e=>{ data.imageData = e.target.result; data.imageName = f.name; pendingFile = false; finalize(); }; reader.readAsDataURL(f); }
+                        }
+                    } else if(k==='cantidad'){
+                        const el = inputs[k]; data[k] = parseInt((el && el.value) || 0) || 0;
+                    } else {
+                        const obj = inputs[k];
+                        let val = '';
+                        if(obj){
+                            if(obj.select){ const selv = obj.select.value; if(selv==='__OTHER__') val = (obj.other.value||''); else if(selv==='__ANY__') val = ''; else val = selv; }
+                            else if(obj.value!==undefined) val = obj.value || '';
+                        }
+                        data[k] = val;
+                    }
+                });
+                if(!pendingFile) finalize();
+            }catch(err){ console.error('Error en guardar nuevo producto',err); alert('Error al guardar (ver consola)'); }
+        };
+        const cancel = document.createElement('button'); cancel.innerText='Cancelar'; cancel.onclick=()=>{ formArea.classList.add('hidden'); };
+        btns.appendChild(save); btns.appendChild(cancel); wrapper.appendChild(btns); formArea.appendChild(wrapper);
+    }
+
+    // --- Table rendering ---
+    function renderTable(cat, filter=''){
+        console.log('renderTable start',cat,filter);
+        const field = filterField? filterField.value : 'Todos';
+        const q = (filter||'').toString().trim().toLowerCase();
+        tablesArea.innerHTML = '';
+        const renderCategory = (c)=>{
+            if(!templates[c]) return;
+            const cont = document.createElement('div'); cont.className='container';
+            const h = document.createElement('h3'); h.innerText = c.toUpperCase(); cont.appendChild(h);
+            const tbl = document.createElement('table');
+            const thead = document.createElement('thead'); const hr = document.createElement('tr');
+            templates[c].forEach(col=>{ const th=document.createElement('th'); th.innerText=col.toUpperCase(); hr.appendChild(th); });
+            const tha = document.createElement('th'); tha.innerText='ACCIONES'; hr.appendChild(tha); thead.appendChild(hr); tbl.appendChild(thead);
+            const tbody = document.createElement('tbody');
+            (inventory[c]||[]).forEach(item=>{
+                try{
+                    // match depending on selected field
+                    let match = true;
+                    if(q){
+                        if(field==='Todos'){
+                            const text = (Object.values(item).join(' ') + ' ' + c).toLowerCase(); match = text.includes(q);
+                        } else if(field==='categoria'){
+                            match = c.toLowerCase().includes(q);
+                        } else {
+                            const val = (item[field] || '').toString().toLowerCase(); match = val.includes(q);
+                        }
+                    }
+                    if(!match) return;
+                    const tr = document.createElement('tr');
+                    templates[c].forEach(key=>{
+                        const td = document.createElement('td');
+                        if(key==='image'){
+                            if(item.imageData){ const img=document.createElement('img'); img.src=item.imageData; img.style.height='40px'; td.appendChild(img); }
+                            else if(item.imageName) td.innerText = item.imageName; else td.innerText = '-';
+                        } else td.innerText = item[key] || '';
+                        tr.appendChild(td);
+                    });
+                    const tdA = document.createElement('td'); tdA.className='actions';
+                    const inBtn = document.createElement('button'); inBtn.innerText='Entrada';
+                    inBtn.addEventListener('click', ()=>{ try{ const q=parseInt(prompt('Cantidad a agregar')||0); if(!q) return; item.cantidad=(parseInt(item.cantidad)||0)+q; saveInventory(); renderTable(cat,filter); }catch(e){ console.error('Entrada error',e); alert('Error en entrada (ver consola)'); } });
+                    const outBtn = document.createElement('button'); outBtn.innerText='Salida';
+                    outBtn.addEventListener('click', ()=>{ try{ const q=parseInt(prompt('Cantidad a retirar')||0); if(!q) return; if((item.cantidad||0)<q) return alert('Stock insuficiente'); item.cantidad=(parseInt(item.cantidad)||0)-q; saveInventory(); renderTable(cat,filter); }catch(e){ console.error('Salida error',e); alert('Error en salida (ver consola)'); } });
+                    const delBtn = document.createElement('button'); delBtn.innerText='Eliminar';
+                    delBtn.addEventListener('click', ()=>{ try{ if(!confirm('Eliminar producto?')) return; inventory[c]=inventory[c].filter(x=>x.id!==item.id); saveInventory(); renderTable(cat,filter); }catch(e){ console.error('Eliminar error',e); alert('Error al eliminar (ver consola)'); } });
+                    tdA.appendChild(inBtn); tdA.appendChild(outBtn); tdA.appendChild(delBtn); tr.appendChild(tdA);
+                    tbody.appendChild(tr);
+                }catch(err){ console.error('Error renderTable item',item,err); }
+            });
+            tbl.appendChild(tbody); cont.appendChild(tbl); tablesArea.appendChild(cont);
+        };
+
+        if(cat==='todas'){
+            allCategories.forEach(c=> renderCategory(c));
+        } else {
+            if(!templates[cat]){ console.error('renderTable: categoría inválida',cat); return; }
+            renderCategory(cat);
+        }
+    }
+
+    // --- Admin functions ---
+    function actualizarUsuariosAdmin(){
+        const tbody = document.querySelector('#tablaUsuariosAdmin tbody'); tbody.innerHTML='';
+        for(const u in usuarios){ if(u==='admin') continue; const tr = document.createElement('tr'); const td1=document.createElement('td'); td1.innerText=u; const td2=document.createElement('td'); td2.innerText = usuarios[u].autorizado? 'Autorizado':'Pendiente'; const td3=document.createElement('td'); const b1=document.createElement('button'); b1.innerText='✔'; b1.onclick=()=>{ usuarios[u].autorizado=true; log.push({fecha:new Date().toLocaleString(),usuario:'admin',accion:'Autorizó '+u}); saveUsers(); saveLog(); actualizarUsuariosAdmin(); actualizarLogAdmin(); }; const b2=document.createElement('button'); b2.innerText='✖'; b2.onclick=()=>{ usuarios[u].autorizado=false; log.push({fecha:new Date().toLocaleString(),usuario:'admin',accion:'Bloqueó '+u}); saveUsers(); saveLog(); actualizarUsuariosAdmin(); actualizarLogAdmin(); }; td3.appendChild(b1); td3.appendChild(b2); tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tbody.appendChild(tr); }
+    }
+    function actualizarLogAdmin(){ const tbody = document.querySelector('#tablaLogAdmin tbody'); tbody.innerHTML=''; log.forEach(l=>{ const tr=document.createElement('tr'); const td1=document.createElement('td'); td1.innerText=l.fecha; const td2=document.createElement('td'); td2.innerText=l.usuario; const td3=document.createElement('td'); td3.innerText=l.accion; tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tbody.appendChild(tr); }); }
+
+    try{
+        const exportLogBtn = document.getElementById('exportLogCSV');
+        if(exportLogBtn) exportLogBtn.addEventListener('click', ()=>{ let csv='Fecha,Usuario,Accion\n'; log.forEach(l=> csv += `${l.fecha},${l.usuario},${l.accion}\n`); const a=document.createElement('a'); a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv); a.download='bitacora_bodega.csv'; a.click(); });
+        else console.warn('exportLogCSV button missing');
+
+        if(!categoriaSel) console.error('categoriaSel missing');
+        categoriaSel.addEventListener('change', ()=>{ console.log('categoria changed to',categoriaSel.value); formArea.classList.add('hidden'); populateFilterOptions(categoriaSel.value); renderTable(categoriaSel.value, busqueda.value); });
+        busqueda.addEventListener('input', ()=>{ console.log('busqueda', busqueda.value); renderTable(categoriaSel.value, busqueda.value); });
+        filterField.addEventListener('change', ()=>{ console.log('filterField', filterField.value); renderTable(categoriaSel.value, busqueda.value); });
+        btnAdvancedSearch.addEventListener('click', ()=>{ openAdvancedSearch(); });
+        applySearchBtn.addEventListener('click', ()=>{ applyAdvancedSearch(); });
+        cancelSearchBtn.addEventListener('click', ()=>{ cancelSearch(); });
+        btnNew.addEventListener('click', ()=>{ console.log('btnNew clicked for',categoriaSel.value); renderForm(categoriaSel.value); });
+        btnLogout.addEventListener('click', ()=>{ try{ localStorage.removeItem('activo'); location.href='index.html'; }catch(e){ console.error('logout error',e); } });
+    }catch(err){ console.error('Error wiring events',err); }
+
+    // --- Init ---
+    if(!activo){ alert('No estás autenticado'); location.href='index.html'; }
+    usuarioActivoEl.innerText = activo;
+    if(activo==='admin'){ adminPanel.classList.remove('hidden'); actualizarUsuariosAdmin(); actualizarLogAdmin(); }
+    // populate filter options and initial render
+    populateFilterOptions(categoriaSel.value);
+    renderTable(categoriaSel.value);
+
+    </script>
+
+</body>
+</html>
