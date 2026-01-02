@@ -86,14 +86,17 @@
         <div class="controls">
             <div class="control-group">
                 <label>Categoría</label>
-                <select id="categoriaSel">
-                    <option value="todas" selected>Todas</option>
-                    <option value="agotados">⚠️ Agotados (Stock 0)</option>
-                    <option value="vidrio">Vidrio</option>
-                    <option value="aluminio">Aluminio</option>
-                    <option value="herrajes">Herrajes</option>
-                    <option value="insumos">Insumos</option>
-                </select>
+                <div style="display:flex; gap:5px; width:100%">
+                    <select id="categoriaSel" style="flex:1">
+                        <option value="todas" selected>Todas</option>
+                        <option value="agotados">⚠️ Agotados (Stock 0)</option>
+                        <option value="vidrio">Vidrio</option>
+                        <option value="aluminio">Aluminio</option>
+                        <option value="herrajes">Herrajes</option>
+                        <option value="insumos">Insumos</option>
+                    </select>
+                    <button id="btnRefresh" class="btn btn-outline" title="Actualizar datos" style="padding:0 10px; font-size:1.2rem; height: 38px;">↻</button>
+                </div>
             </div>
             <div class="control-group">
                 <label>Buscar</label>
@@ -665,6 +668,17 @@
                 let pendingFile = false;
 
                 async function finalize(){
+                    // Safety Check: Verify duplicates on server before creating
+                    setLoading(true, 'Verificando duplicados...', true);
+                    try {
+                        await loadInventoryForCategory(cat);
+                    } catch(e) {
+                        console.warn('Could not verify duplicates on server', e);
+                        if(!confirm('No se pudo verificar si el producto ya existe en el servidor (error de conexión). ¿Desea continuar de todos modos?')) {
+                            return;
+                        }
+                    }
+
                     // ensure category array exists
                     inventory[cat] = inventory[cat] || [];
                     const arr = inventory[cat];
@@ -680,6 +694,32 @@
                             if(it.nombre===data.nombre && it.tipo===data.tipo && it.codigo===data.codigo) dup=i;
                         }
                     });
+
+                    if(dup !== -1){
+                        const ex = arr[dup];
+                        const qToAdd = parseInt(data.cantidad)||0;
+                        
+                        // Option to merge stock
+                        if(confirm(`⚠️ El producto ya existe.\nCódigo: ${ex.codigo}\nStock actual: ${ex.cantidad}\n\n¿Desea sumar la cantidad ingresada (${qToAdd}) al stock existente?`)){
+                             setLoading(true, 'Actualizando stock...', true);
+                             try {
+                                 const newQty = (parseInt(ex.cantidad)||0) + qToAdd;
+                                 // Use the existing item 'ex' which has the correct ID/SKU from server
+                                 await updateQuantityRemote(cat, ex, newQty);
+                                 alert('Stock actualizado correctamente.');
+                                 formArea.classList.add('hidden');
+                                 renderTable(cat, busqueda.value);
+                             } catch(e) {
+                                 console.error(e);
+                                 alert('Error al actualizar stock: ' + e.message);
+                             } finally {
+                                 setLoading(false);
+                             }
+                        }
+                        return;
+                    }
+
+                    setLoading(true, 'Guardando nuevo producto...', true);
 
                     // Send to Apps Script as URL-encoded form (image as base64 field). On error, save locally.
                     // Clean data for notes: ONLY keep user notes, do not dump all data there
@@ -783,12 +823,35 @@
                 }
 
                 // collect fields and handle image conversion
-                function fileToDataURL(file){
+                // Extreme compression: Max 100px (Thumbnail size), Quality 10%
+                // Nota: Esto solo afecta a NUEVAS imágenes subidas. Las anteriores mantienen su calidad.
+                function compressImage(file, maxWidth = 100, quality = 0.1){
                     return new Promise((resolve, reject)=>{
                         const reader = new FileReader();
-                        reader.onload = e => resolve(e.target.result);
-                        reader.onerror = e => reject(e);
                         reader.readAsDataURL(file);
+                        reader.onload = e => {
+                            const img = new Image();
+                            img.src = e.target.result;
+                            img.onload = () => {
+                                const canvas = document.createElement('canvas');
+                                let w = img.width;
+                                let h = img.height;
+                                // Resize logic
+                                if(w > h){
+                                    if(w > maxWidth){ h *= maxWidth/w; w = maxWidth; }
+                                } else {
+                                    if(h > maxWidth){ w *= maxWidth/h; h = maxWidth; }
+                                }
+                                canvas.width = w;
+                                canvas.height = h;
+                                const ctx = canvas.getContext('2d');
+                                ctx.drawImage(img, 0, 0, w, h);
+                                // Compress to JPEG
+                                resolve(canvas.toDataURL('image/jpeg', quality));
+                            };
+                            img.onerror = err => reject(err);
+                        };
+                        reader.onerror = err => reject(err);
                     });
                 }
 
@@ -798,13 +861,14 @@
                         if(f){
                             pendingFile = true;
                             try{
-                                const dataUrl = await fileToDataURL(f);
-                                data.imageData = dataUrl; // data URL for immediate preview/local storage
+                                // Compress image to reduce payload size and load times
+                                const dataUrl = await compressImage(f);
+                                data.imageData = dataUrl; 
                                 const base64 = dataUrl.split(',')[1] || '';
                                 data.imageBase64 = base64;
-                                data.imageName = f.name;
-                                data.imageMime = f.type || 'image/png';
-                            }catch(err){ console.warn('File read failed',err); }
+                                data.imageName = f.name.replace(/\.[^/.]+$/, "") + ".jpg"; // Force jpg extension
+                                data.imageMime = 'image/jpeg';
+                            }catch(err){ console.warn('Image compression failed',err); }
                             pendingFile = false;
                         }
                     } else if(k==='cantidad'){
@@ -834,7 +898,11 @@
         if(url.startsWith('data:')) return url; 
         // Extract ID from: https://drive.google.com/file/d/ID/view...
         const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-        if(match && match[1]) return `https://lh3.googleusercontent.com/d/${match[1]}`;
+        if(match && match[1]) {
+            // Optimización: Solicitar miniatura (thumbnail) de 100px en lugar de la imagen completa.
+            // Esto hace que las imágenes antiguas pesen ~5KB en lugar de 5MB.
+            return `https://drive.google.com/thumbnail?id=${match[1]}&sz=s100`;
+        }
         return url;
     }
 
@@ -893,6 +961,7 @@
                                 if(src){ 
                                     const img=document.createElement('img'); 
                                     img.src=src; 
+                                    img.loading = 'lazy'; // Carga diferida de imágenes
                                     img.style.height='40px'; 
                                     img.style.objectFit='contain';
                                     img.style.borderRadius='4px';
@@ -918,10 +987,72 @@
                         const tdA = document.createElement('td'); tdA.className='actions';
                         const inBtn = document.createElement('button'); inBtn.innerText='Entrada'; inBtn.className='btn-entry';
                         if(isSyncing) { inBtn.disabled=true; inBtn.style.opacity='0.5'; inBtn.style.cursor='not-allowed'; }
-                        inBtn.addEventListener('click', async ()=>{ try{ const q=parseInt(prompt('Cantidad a agregar')||0); if(!q) return; const newQty = (parseInt(item.cantidad)||0) + q; await updateQuantityRemote(c, item, newQty); item.cantidad = newQty; renderTable(categoriaSel.value, busqueda.value); }catch(e){ console.error('Entrada error',e); alert('Error en entrada (ver consola) - '+(e.message||e)); } });
+                        inBtn.addEventListener('click', async ()=>{ 
+                            try{ 
+                                const q=parseInt(prompt('Cantidad a agregar')||0); 
+                                if(!q) return; 
+                                
+                                // Safety Check: Fetch latest data before modifying
+                                setLoading(true, 'Verificando stock en servidor...', true);
+                                await loadInventoryForCategory(c);
+                                const freshItem = (inventory[c]||[]).find(x => x.id === item.id || x.codigo === item.codigo);
+                                
+                                if(!freshItem){
+                                    alert('Error: El producto no se encuentra en el servidor (pudo ser eliminado).');
+                                    renderTable(categoriaSel.value, busqueda.value);
+                                    return;
+                                }
+
+                                const newQty = (parseInt(freshItem.cantidad)||0) + q; 
+                                await updateQuantityRemote(c, freshItem, newQty); 
+                                // updateQuantityRemote already reloads inventory on success if configured, 
+                                // but we can update local item just in case to reflect immediately if reload is skipped
+                                item.cantidad = newQty; 
+                                renderTable(categoriaSel.value, busqueda.value); 
+                            }catch(e){ 
+                                console.error('Entrada error',e); 
+                                alert('Error en entrada: '+(e.message||e)); 
+                            } finally {
+                                setLoading(false);
+                            }
+                        });
+
                         const outBtn = document.createElement('button'); outBtn.innerText='Salida'; outBtn.className='btn-exit';
                         if(isSyncing) { outBtn.disabled=true; outBtn.style.opacity='0.5'; outBtn.style.cursor='not-allowed'; }
-                        outBtn.addEventListener('click', async ()=>{ try{ const q=parseInt(prompt('Cantidad a retirar')||0); if(!q) return; if((item.cantidad||0) < q) return alert('Stock insuficiente'); const newQty = (parseInt(item.cantidad)||0) - q; await updateQuantityRemote(c, item, newQty); item.cantidad = newQty; renderTable(categoriaSel.value, busqueda.value); }catch(e){ console.error('Salida error',e); alert('Error en salida (ver consola) - '+(e.message||e)); } });
+                        outBtn.addEventListener('click', async ()=>{ 
+                            try{ 
+                                const q=parseInt(prompt('Cantidad a retirar')||0); 
+                                if(!q) return; 
+                                
+                                // Safety Check: Fetch latest data before modifying
+                                setLoading(true, 'Verificando stock en servidor...', true);
+                                await loadInventoryForCategory(c);
+                                const freshItem = (inventory[c]||[]).find(x => x.id === item.id || x.codigo === item.codigo);
+
+                                if(!freshItem){
+                                    alert('Error: El producto no se encuentra en el servidor (pudo ser eliminado).');
+                                    renderTable(categoriaSel.value, busqueda.value);
+                                    return;
+                                }
+
+                                const currentStock = parseInt(freshItem.cantidad)||0;
+                                if(currentStock < q) {
+                                    alert(`Stock insuficiente en el servidor.\nStock actual real: ${currentStock}\nIntentaste retirar: ${q}`);
+                                    renderTable(categoriaSel.value, busqueda.value);
+                                    return;
+                                }
+
+                                const newQty = currentStock - q; 
+                                await updateQuantityRemote(c, freshItem, newQty); 
+                                item.cantidad = newQty; 
+                                renderTable(categoriaSel.value, busqueda.value); 
+                            }catch(e){ 
+                                console.error('Salida error',e); 
+                                alert('Error en salida: '+(e.message||e)); 
+                            } finally {
+                                setLoading(false);
+                            }
+                        });
                         
                         tdA.appendChild(inBtn); tdA.appendChild(outBtn); tr.appendChild(tdA);
                         tbody.appendChild(tr);
@@ -970,27 +1101,55 @@
 
         if(!categoriaSel) console.error('categoriaSel missing');
         categoriaSel.addEventListener('change', async ()=>{ 
-            try{ 
-                console.log('categoria changed to',categoriaSel.value); 
-                formArea.classList.add('hidden'); 
-                
-                // Render local data first
-                renderTable(categoriaSel.value, busqueda.value);
-                populateFilterOptions(categoriaSel.value); 
+            console.log('categoria changed to',categoriaSel.value); 
+            formArea.classList.add('hidden'); 
+            
+            // 1. Render local data immediately (Instant UI)
+            populateFilterOptions(categoriaSel.value); 
+            renderTable(categoriaSel.value, busqueda.value);
 
-                setLoading(true, 'Sincronizando...', false); // Non-blocking sync
-
-                // Use optimized loadAllInventory for everything to ensure consistency and speed
-                await loadAllInventory();
-                renderTable(categoriaSel.value, busqueda.value);
+            // 2. Background Sync (Real-time data)
+            // Fetch fresh data for this category without blocking the UI
+            const cat = categoriaSel.value;
+            try {
+                setLoading(true, 'Actualizando...', false); // Minimized indicator
                 
-                setLoading(false);
+                if(cat === 'todas' || cat === 'agotados'){
+                     // Parallel load for speed
+                     await Promise.all(allCategories.map(c => loadInventoryForCategory(c)));
+                } else {
+                     await loadInventoryForCategory(cat);
+                }
                 
-            }catch(e){ 
-                console.error('categoria change handler failed',e); 
+                // Only re-render if user is still on the same category
+                if(categoriaSel.value === cat){
+                    renderTable(categoriaSel.value, busqueda.value);
+                }
+            } catch(e) {
+                console.error('Background sync error', e);
+            } finally {
                 setLoading(false);
-            } 
+            }
         });
+
+        // Manual Refresh Button
+        const btnRefresh = document.getElementById('btnRefresh');
+        if(btnRefresh) {
+            btnRefresh.addEventListener('click', async () => {
+                const cat = categoriaSel.value;
+                setLoading(true, 'Actualizando...', false);
+                try {
+                    if(cat === 'todas' || cat === 'agotados'){
+                         // Parallel load for speed
+                         await Promise.all(allCategories.map(c => loadInventoryForCategory(c)));
+                    } else {
+                         await loadInventoryForCategory(cat);
+                    }
+                    renderTable(cat, busqueda.value);
+                } catch(e){ console.error(e); }
+                finally { setLoading(false); }
+            });
+        }
         busqueda.addEventListener('input', ()=>{ console.log('busqueda', busqueda.value); renderTable(categoriaSel.value, busqueda.value); });
         filterField.addEventListener('change', ()=>{ console.log('filterField', filterField.value); renderTable(categoriaSel.value, busqueda.value); });
         btnAdvancedSearch.addEventListener('click', ()=>{ openAdvancedSearch(); });
@@ -1008,27 +1167,36 @@
     try{
         populateFilterOptions(categoriaSel.value);
         
-        // 1. Render immediately with local data (Instant Load)
-        renderTable(categoriaSel.value, busqueda.value);
+        // 1. Render immediately with local data (Instant Load) - DISABLED per user request
+        // renderTable(categoriaSel.value, busqueda.value); 
 
         // attempt to sync categories with Apps Script (best-effort)
-        try{ syncCategoriesToGAS(); }catch(e){}
+        // try{ syncCategoriesToGAS(); }catch(e){} // Moved to end of loading sequence to prioritize data
         
-        // 2. Fetch fresh data in background and re-render
+        // 2. Fetch fresh data in foreground (Blocking)
+        // Carga obligatoria de datos frescos antes de permitir el uso de la app.
         try{
             (async ()=>{
-                setLoading(true, 'Sincronizando...', false); // Non-blocking sync
+                setLoading(true, 'Cargando inventario...', true); // Blocking sync
                 
-                // Optimized: Load ALL inventory in one request
-                await loadAllInventory();
+                // Optimización: Carga paralela (4x más rápido).
+                // Se lanzan todas las peticiones a la vez para minimizar el tiempo de espera.
+                const promises = allCategories.map(c => loadInventoryForCategory(c));
+                await Promise.all(promises);
+
                 renderTable(categoriaSel.value, busqueda.value);
 
-                // Save fresh data to local storage
+                // Save fresh data to local storage (backup only)
                 saveInventory();
+                
+                // Sync categories metadata in background
+                try{ syncCategoriesToGAS(); }catch(e){}
+
                 setLoading(false);
             })().catch(err=>{ 
                 console.error('Error loading inventory on init',err); 
                 setLoading(false);
+                alert('Error al cargar inventario. Verifique su conexión.');
             });
         }catch(err){ console.error('Inicialización (sync) falló',err); }
     }catch(e){
