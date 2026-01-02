@@ -1349,8 +1349,27 @@
             if(html5QrcodeScanner) return; // Already running
             
             // Use html5-qrcode library
-            html5QrcodeScanner = new Html5Qrcode("reader");
-            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+            // Configurar para soportar códigos de barras 1D (EAN, UPC, Code 128, etc.) además de QR
+            const formats = [
+                Html5QrcodeSupportedFormats.QR_CODE,
+                Html5QrcodeSupportedFormats.EAN_13,
+                Html5QrcodeSupportedFormats.EAN_8,
+                Html5QrcodeSupportedFormats.CODE_128,
+                Html5QrcodeSupportedFormats.CODE_39,
+                Html5QrcodeSupportedFormats.UPC_A,
+                Html5QrcodeSupportedFormats.UPC_E,
+                Html5QrcodeSupportedFormats.CODABAR,
+                Html5QrcodeSupportedFormats.ITF
+            ];
+
+            html5QrcodeScanner = new Html5Qrcode("reader", { formatsToSupport: formats, verbose: false });
+            
+            // Ajustar qrbox para que sea más ancho (mejor para códigos de barras)
+            const config = { 
+                fps: 10, 
+                qrbox: { width: 280, height: 150 },
+                aspectRatio: 1.0
+            };
             
             html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess)
             .catch(err => {
