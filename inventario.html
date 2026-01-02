@@ -1416,10 +1416,23 @@
         });
 
         function startScanner(){
+            // Limpieza robusta antes de iniciar
             if(html5QrcodeScanner) {
-                // Si ya existe una instancia, intentar detenerla primero
-                try { html5QrcodeScanner.stop().then(()=>{ html5QrcodeScanner.clear(); html5QrcodeScanner=null; startScanner(); }); } 
-                catch(e){ html5QrcodeScanner=null; }
+                try { 
+                    html5QrcodeScanner.stop().then(()=>{ 
+                        html5QrcodeScanner.clear(); 
+                        html5QrcodeScanner=null; 
+                        // Pequeño delay para asegurar que la cámara se liberó
+                        setTimeout(startScanner, 200); 
+                    }).catch(err=>{
+                        console.warn('Stop failed', err);
+                        html5QrcodeScanner=null;
+                        setTimeout(startScanner, 200);
+                    });
+                } catch(e){ 
+                    html5QrcodeScanner=null; 
+                    setTimeout(startScanner, 200);
+                }
                 return;
             }
             
@@ -1435,29 +1448,37 @@
                 Html5QrcodeSupportedFormats.CODABAR
             ];
 
-            // Configuración más conservadora para evitar bloqueos
+            // Configuración estándar
             html5QrcodeScanner = new Html5Qrcode("reader", { 
                 formatsToSupport: formats, 
                 verbose: false
             });
             
             const config = { 
-                fps: 15, // Aumentar ligeramente FPS para mejor seguimiento
-                qrbox: { width: 300, height: 150 }, // Más ancho para capturar códigos largos
+                fps: 10, // Volver a 10 FPS para máxima estabilidad
+                qrbox: { width: 280, height: 150 }, 
                 aspectRatio: 1.0
             };
             
-            // Usar configuración de cámara optimizada para enfoque y nitidez
+            // Configuración de cámara simplificada para máxima compatibilidad
+            // Eliminamos 'advanced' y 'ideal' que pueden fallar en algunos dispositivos
             const constraints = { 
-                facingMode: "environment",
-                width: { ideal: 1280 }, // Solicitar HD si es posible (mejora detección)
-                height: { ideal: 720 },
-                advanced: [{ focusMode: "continuous" }] // Intentar forzar enfoque continuo
+                facingMode: "environment" 
             };
             
             html5QrcodeScanner.start(constraints, config, onScanSuccess)
             .catch(err => {
                 console.error("Error starting scanner", err);
+                // Fallback: Intentar con cámara frontal si la trasera falla o configuración genérica
+                if(err.message && err.message.includes("OverconstrainedError")){
+                     console.log("Retrying with generic constraints...");
+                     html5QrcodeScanner.start({ facingMode: "user" }, config, onScanSuccess);
+                } else {
+                    alert("No se pudo iniciar la cámara. " + (err.message || ""));
+                    stopScanner();
+                }
+            });
+        }
                 alert("No se pudo iniciar la cámara. " + (err.message || ""));
                 stopScanner();
             });
