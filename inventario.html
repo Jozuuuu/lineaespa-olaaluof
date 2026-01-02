@@ -102,10 +102,6 @@
             <div class="control-group">
                 <label>Buscar</label>
                 <input id="busqueda" placeholder="Escribe para buscar...">
-                <div style="display:flex; align-items:center; gap:5px; margin-top:5px;">
-                    <input type="checkbox" id="scannerMode">
-                    <label for="scannerMode" style="font-size:0.9rem; cursor:pointer; user-select:none;">Modo Escáner (Auto-seleccionar)</label>
-                </div>
             </div>
             <div class="control-group">
                 <label>Filtrar por</label>
@@ -1237,20 +1233,6 @@
         }
         busqueda.addEventListener('input', ()=>{ console.log('busqueda', busqueda.value); renderTable(categoriaSel.value, busqueda.value); });
         
-        // Scanner Mode Logic
-        const scannerMode = document.getElementById('scannerMode');
-        if(scannerMode){
-            scannerMode.addEventListener('change', ()=>{
-                if(scannerMode.checked) busqueda.focus();
-            });
-            busqueda.addEventListener('keydown', (e)=>{
-                if(e.key === 'Enter' && scannerMode.checked){
-                    e.preventDefault();
-                    busqueda.select(); // Select all text to prepare for next scan
-                }
-            });
-        }
-
         // --- Camera Scanner Logic ---
         const btnCameraScan = document.getElementById('btnCameraScan');
         const cameraScanModal = document.getElementById('cameraScanModal');
