@@ -12,22 +12,43 @@ module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(204).end();
 
   try {
-    const method = req.method || 'GET';
-    // Forward body as JSON to GAS
-    const body = (req.body && Object.keys(req.body).length>0) ? req.body : undefined;
+    // Read body robustly: Vercel may or may not populate req.body depending on content-type
+    let bodyObj = {};
+    if (req.method !== 'GET'){
+      if (req.body && Object.keys(req.body).length > 0) {
+        bodyObj = req.body;
+      } else {
+        // try to read raw text
+        const txt = await new Promise((resolve, reject) => {
+          let data = '';
+          req.on && req.on('data', chunk => data += chunk);
+          req.on && req.on('end', () => resolve(data));
+          req.on && req.on('error', err => reject(err));
+          // timeout fallback
+          setTimeout(() => resolve(''), 50);
+        });
+        try{ bodyObj = txt ? JSON.parse(txt) : {}; }catch(e){ bodyObj = txt || {}; }
+      }
+    }
 
     const fetchOpts = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: body ? JSON.stringify(body) : JSON.stringify({})
+      body: JSON.stringify(bodyObj || {})
     };
 
     const r = await fetch(GAS_URL, fetchOpts);
     const text = await r.text();
     // Mirror status and body
-    res.status(r.status || 200).send(text);
+    // Try to set JSON content-type if response looks like JSON
+    const ct = r.headers.get('content-type') || '';
+    if(ct.includes('application/json')){
+      try{ const j = JSON.parse(text); return res.status(r.status || 200).json(j); }catch(e){ /* fallthrough */ }
+    }
+    return res.status(r.status || 200).send(text);
   } catch (err) {
-    console.error('proxy error', err);
-    res.status(500).json({ ok: false, error: String(err) });
+    console.error('proxy error', err && err.stack ? err.stack : err);
+    // return error details to help debugging (will appear in Vercel logs and response)
+    res.status(500).json({ ok: false, error: String(err), stack: err && err.stack ? err.stack.split('\n').slice(0,5) : undefined });
   }
 };
