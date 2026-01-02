@@ -146,10 +146,14 @@ function doPost(e){
           updates[canonical] = val;
         }
       });
-      // handle original header names provided in payload
+      // Prepare a case-insensitive map of payload keys for header matching
+      const payloadNormalized = {};
+      Object.keys(p).forEach(k => { payloadNormalized[String(k).trim().toLowerCase()] = p[k]; });
+      // handle original header names provided in payload (case-insensitive)
       headers.forEach((h,i)=>{
-        if(p.hasOwnProperty(h)){
-          const val = p[h];
+        const key = String(h||'').trim().toLowerCase();
+        if(payloadNormalized.hasOwnProperty(key)){
+          const val = payloadNormalized[key];
           sh.getRange(rowIndex + 2, i + 1).setValue(val);
           updates[h] = val;
         }
@@ -160,11 +164,6 @@ function doPost(e){
 
     // 'create' action explicitly appends a new row. Otherwise do NOT append.
     if(action === 'create'){
-      const category = p.category || '';
-      const name = p.name || '';
-      const sku = p.sku || '';
-      const quantity = p.quantity || '';
-      const notes = p.notes || '';
       const imageBase64 = p.imageBase64 || p.image || '';
       const imageName = p.imageName || ('img_'+Date.now()+'.png');
       const imageMime = p.imageMime || 'image/png';
@@ -186,8 +185,72 @@ function doPost(e){
         }
       }
 
-      const ts = new Date();
-      sh.appendRow([ts, inventoryId, category, name, sku, quantity, notes, imageUrl]);
+      // Build a row aligned with existing headers so individual fields go into separate columns
+      const data = sh.getDataRange().getValues();
+      const headers = data.shift() || [];
+      const headerMap = buildHeaderMap(headers);
+
+      // Try to parse notes JSON if provided
+      let notesObj = null;
+      if(p.notes){
+        try{ notesObj = typeof p.notes === 'string' ? JSON.parse(p.notes) : p.notes; }catch(e){ notesObj = null; }
+      }
+
+      // Normalize payload keys for case-insensitive matching
+      const payloadNormalized = {};
+      Object.keys(p).forEach(k => { payloadNormalized[String(k).trim().toLowerCase()] = p[k]; });
+
+      // Helper to pick value from payloadNormalized, canonical key, or notes object
+      function pick(key){
+        const k = String(key||'').trim().toLowerCase();
+        if(payloadNormalized.hasOwnProperty(k)) return payloadNormalized[k];
+        if(notesObj && notesObj.hasOwnProperty(key)) return notesObj[key];
+        if(notesObj && notesObj.hasOwnProperty(k)) return notesObj[k];
+        // support some Spanish keys mapping
+        const spanishMap = { nombre:'name', codigo:'sku', cantidad:'quantity', imagen:'imageUrl', imagenurl:'imageUrl' };
+        const mapped = spanishMap[k];
+        if(mapped){
+          const mk = mapped.toString().toLowerCase();
+          if(payloadNormalized.hasOwnProperty(mk)) return payloadNormalized[mk];
+          if(notesObj && notesObj.hasOwnProperty(mapped)) return notesObj[mapped];
+          if(notesObj && notesObj.hasOwnProperty(mk)) return notesObj[mk];
+        }
+        return null;
+      }
+
+      const row = headers.map(h => '');
+      // set timestamp and inventoryId if headers exist
+      if(headerMap.timestamp !== undefined) row[headerMap.timestamp] = new Date();
+      if(headerMap.inventoryId !== undefined) row[headerMap.inventoryId] = inventoryId;
+
+      // fill known canonical fields
+      Object.keys(HEADER_ALIASES).forEach(canonical => {
+        const idx = headerMap[canonical];
+        if(idx !== undefined && idx !== -1){
+          const v = pick(canonical);
+          if(v !== null && v !== undefined) row[idx] = v;
+        }
+      });
+
+      // Also fill by raw header names if payload contains matching keys (case-insensitive)
+      headers.forEach((h,i)=>{
+        const key = String(h||'').trim().toLowerCase();
+        if(payloadNormalized.hasOwnProperty(key)) row[i] = payloadNormalized[key];
+      });
+
+      // Ensure imageUrl column receives imageUrl
+      if(imageUrl){
+        if(headerMap.imageUrl !== undefined) row[headerMap.imageUrl] = imageUrl;
+        else if(headers.indexOf('imageUrl') !== -1) row[headers.indexOf('imageUrl')] = imageUrl;
+      }
+
+      // If notes column exists and wasn't mapped, store the raw notes JSON
+      if(headerMap.notes !== undefined){
+        if(p.notes && row[headerMap.notes] === '') row[headerMap.notes] = (typeof p.notes === 'string' ? p.notes : JSON.stringify(p.notes));
+        else if(!p.notes && notesObj && row[headerMap.notes] === '') row[headerMap.notes] = JSON.stringify(notesObj);
+      }
+
+      sh.appendRow(row);
       return ContentService.createTextOutput(JSON.stringify({ok:true, imageUrl:imageUrl})).setMimeType(ContentService.MimeType.JSON);
     }
 

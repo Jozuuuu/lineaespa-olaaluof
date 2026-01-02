@@ -187,7 +187,11 @@
             const res = await fetch(GAS_URL, { method: 'POST', headers: {'Content-Type':'application/json;charset=UTF-8'}, body: JSON.stringify(payload) });
             const txt = await res.text();
             let j={}; try{ j = txt ? JSON.parse(txt) : {}; }catch(e){ console.warn('Invalid JSON from GAS update',txt); }
-            if(j && j.ok) return true; else throw new Error(j && j.error ? j.error : ('HTTP '+res.status));
+            if(j && j.ok){
+                // refresh authoritative data from Sheets for this category
+                try{ await loadInventoryForCategory(cat); }catch(e){ console.warn('Reload after update failed',e); }
+                return true;
+            } else throw new Error(j && j.error ? j.error : ('HTTP '+res.status));
         }catch(err){ console.error('updateQuantityRemote failed',err); throw err; }
     }
 
@@ -468,9 +472,17 @@
                         let j = {};
                         try{ j = txt ? JSON.parse(txt) : {}; }catch(err){ console.warn('Invalid JSON from GAS', err, txt); }
                         if(j && j.ok){
-                            if(dup>=0){ arr[dup].cantidad = (parseInt(arr[dup].cantidad)||0) + (parseInt(data.cantidad)||0); alert('Duplicado: cantidad sumada.'); }
-                            else { arr.push(data); alert('Producto agregado.'); }
-                            saveInventory(); renderTable(cat, busqueda.value);
+                            // reload authoritative data from Sheets for this category
+                            try{
+                                await loadInventoryForCategory(cat);
+                                alert('Producto agregado.');
+                            }catch(e){
+                                // fallback to local update if reload fails
+                                if(dup>=0){ arr[dup].cantidad = (parseInt(arr[dup].cantidad)||0) + (parseInt(data.cantidad)||0); alert('Duplicado: cantidad sumada (local).'); }
+                                else { arr.push(data); alert('Producto agregado (local).'); }
+                                saveInventory();
+                            }
+                            renderTable(cat, busqueda.value);
                         } else {
                             const msg = (j && j.error) ? j.error : (txt || ('HTTP ' + res.status));
                             console.warn('GAS returned error:', msg);
