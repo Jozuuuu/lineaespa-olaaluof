@@ -1434,13 +1434,18 @@
             });
             
             const config = { 
-                fps: 10, // Reducir FPS para evitar sobrecarga
-                qrbox: { width: 250, height: 150 }, // Caja más pequeña para asegurar que cabe en pantalla
+                fps: 15, // Aumentar ligeramente FPS para mejor seguimiento
+                qrbox: { width: 300, height: 150 }, // Más ancho para capturar códigos largos
                 aspectRatio: 1.0
             };
             
-            // Usar configuración de cámara estándar (sin forzar resolución alta)
-            const constraints = { facingMode: "environment" };
+            // Usar configuración de cámara optimizada para enfoque y nitidez
+            const constraints = { 
+                facingMode: "environment",
+                width: { ideal: 1280 }, // Solicitar HD si es posible (mejora detección)
+                height: { ideal: 720 },
+                advanced: [{ focusMode: "continuous" }] // Intentar forzar enfoque continuo
+            };
             
             html5QrcodeScanner.start(constraints, config, onScanSuccess)
             .catch(err => {
