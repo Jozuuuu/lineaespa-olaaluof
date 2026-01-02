@@ -1346,10 +1346,14 @@
         });
 
         function startScanner(){
-            if(html5QrcodeScanner) return; // Already running
+            if(html5QrcodeScanner) {
+                // Si ya existe una instancia, intentar detenerla primero
+                try { html5QrcodeScanner.stop().then(()=>{ html5QrcodeScanner.clear(); html5QrcodeScanner=null; startScanner(); }); } 
+                catch(e){ html5QrcodeScanner=null; }
+                return;
+            }
             
             // Use html5-qrcode library
-            // Configurar para soportar códigos de barras 1D (EAN, UPC, Code 128, etc.) además de QR
             const formats = [
                 Html5QrcodeSupportedFormats.QR_CODE,
                 Html5QrcodeSupportedFormats.EAN_13,
@@ -1358,37 +1362,29 @@
                 Html5QrcodeSupportedFormats.CODE_39,
                 Html5QrcodeSupportedFormats.UPC_A,
                 Html5QrcodeSupportedFormats.UPC_E,
-                Html5QrcodeSupportedFormats.CODABAR,
-                Html5QrcodeSupportedFormats.ITF
+                Html5QrcodeSupportedFormats.CODABAR
             ];
 
-            // Activar detector nativo si está disponible (mucho más rápido y preciso en móviles)
+            // Configuración más conservadora para evitar bloqueos
             html5QrcodeScanner = new Html5Qrcode("reader", { 
                 formatsToSupport: formats, 
-                verbose: false,
-                experimentalFeatures: {
-                    useBarCodeDetectorIfSupported: true
-                }
+                verbose: false
             });
             
-            // Ajustar qrbox para que sea más ancho (mejor para códigos de barras)
             const config = { 
-                fps: 25, // Mayor FPS para detección más rápida
-                qrbox: { width: 300, height: 150 },
+                fps: 10, // Reducir FPS para evitar sobrecarga
+                qrbox: { width: 250, height: 150 }, // Caja más pequeña para asegurar que cabe en pantalla
                 aspectRatio: 1.0
             };
             
-            // Solicitar alta resolución para mejorar el enfoque en códigos pequeños
-            const constraints = { 
-                facingMode: "environment",
-                width: { min: 640, ideal: 1280, max: 1920 },
-                height: { min: 480, ideal: 720, max: 1080 }
-            };
+            // Usar configuración de cámara estándar (sin forzar resolución alta)
+            const constraints = { facingMode: "environment" };
             
             html5QrcodeScanner.start(constraints, config, onScanSuccess)
             .catch(err => {
                 console.error("Error starting scanner", err);
-                alert("No se pudo iniciar la cámara. Asegúrese de dar permisos.");
+                alert("No se pudo iniciar la cámara. " + (err.message || ""));
+                stopScanner();
             });
         }
 
