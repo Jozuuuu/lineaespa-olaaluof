@@ -1539,18 +1539,26 @@
 
             html5QrcodeScanner = new Html5Qrcode("reader", { 
                 formatsToSupport: formats, 
-                verbose: false
+                verbose: false,
+                experimentalFeatures: {
+                    useBarCodeDetectorIfSupported: true
+                }
             });
             
-            // Configuración estable (la que funcionaba mejor)
+            // Configuración optimizada para cilindros y reflejos
             const config = { 
-                fps: 10, 
-                qrbox: { width: 250, height: 150 }, 
-                aspectRatio: 1.0
+                fps: 25, // Más FPS para capturar rápido en movimiento
+                qrbox: { width: 260, height: 180 }, // Área de escaneo
+                aspectRatio: 1.0,
+                disableFlip: false
             };
             
-            // Sin restricciones avanzadas que causan pantalla negra
-            const constraints = { facingMode: "environment" };
+            // Restricciones de cámara con intento de enfoque
+            const constraints = { 
+                facingMode: "environment",
+                focusMode: "continuous",
+                advanced: [{ focusMode: "continuous" }, { zoom: 1.0 }]
+            };
             
             html5QrcodeScanner.start(constraints, config, onScanSuccess)
             .catch(err => {
