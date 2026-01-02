@@ -301,7 +301,12 @@ function doPost(e){
       }
 
       sh.appendRow(row);
-      return ContentService.createTextOutput(JSON.stringify({ok:true, imageUrl:imageUrl})).setMimeType(ContentService.MimeType.JSON);
+      // Return diagnostic info so frontend can verify which columns were used
+      const resp = { ok:true, imageUrl:imageUrl, row: row, headers: headers, headerMap: headerMap };
+      if(p && p.callback){
+        return ContentService.createTextOutput(p.callback + '(' + JSON.stringify(resp) + ')').setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      return ContentService.createTextOutput(JSON.stringify(resp)).setMimeType(ContentService.MimeType.JSON);
     }
 
     return ContentService.createTextOutput(JSON.stringify({error:'No action taken. To append use action=create, to update use action=update and provide sku.'})).setMimeType(ContentService.MimeType.JSON);
