@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Inventario - Aluoferta</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <div class="container">
+        <div class="header-bar">
+            <img src="https://aluoferta.com/wp-content/uploads/2021/03/logo-aluoferta.png" alt="Aluoferta" class="logo" style="margin: 0; height: 40px;" onerror="this.src='img/aluoferta_logo.png'">
+            <div class="user-info">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span>Hola, <b id="usuarioActivo">-</b></span>
+            </div>
+            <button id="btnLogout" class="btn btn-outline" style="color: #ef4444; border-color: #fecaca;">Cerrar sesión</button>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label>Categoría</label>
+                <select id="categoriaSel">
+                    <option value="todas" selected>Todas</option>
+                    <option value="agotados">⚠️ Agotados (Stock 0)</option>
+                    <option value="vidrio">Vidrio</option>
+                    <option value="aluminio">Aluminio</option>
+                    <option value="herrajes">Herrajes</option>
+                    <option value="insumos">Insumos</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Buscar</label>
+                <input id="busqueda" placeholder="Escribe para buscar...">
+            </div>
+            <div class="control-group">
+                <label>Filtrar por</label>
+                <select id="filterField">
+                    <option value="Todos">Todos los campos</option>
+                </select>
+            </div>
+            <div style="display:flex;gap:8px;align-items:flex-end;">
+                <button id="btnAdvancedSearch" class="btn btn-outline">Filtros</button>
+                <button id="btnNew" class="btn btn-primary">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 5v14M5 12h14"/></svg>
+                    Nuevo
+                </button>
+            </div>
+        </div>
+
+        <div id="formArea" class="form-area hidden"></div>
+        <div id="tablesArea"></div>
+
+        <!-- Advanced search modal -->
+        <div id="searchMenu" class="modal hidden">
+            <h3>Búsqueda avanzada</h3>
+            <div id="searchSteps"></div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+                <button id="cancelSearch" class="btn btn-outline">Cancelar</button>
+                <button id="applySearch" class="btn btn-primary">Aplicar filtros</button>
+            </div>
+        </div>
+
+        <div id="adminPanel" class="container hidden admin-panel">
+            <h3>👑 Panel Administrador</h3>
+            <div style="display:flex;gap:20px;flex-wrap:wrap">
+                <div style="flex:1;min-width:280px">
+                    <h4 style="margin-top:0">Usuarios</h4>
+                    <table id="tablaUsuariosAdmin"><thead><tr><th>Usuario</th><th>Estado</th><th>Acción</th></tr></thead><tbody></tbody></table>
+                </div>
+                <div style="flex:1;min-width:280px">
+                    <h4 style="margin-top:0">Bitácora</h4>
+                    <button id="exportLogCSV" class="btn btn-outline" style="margin-bottom:10px;font-size:0.8rem;color:#b45309;border-color:#fcd34d;background:#fff">Exportar CSV</button>
+                    <table id="tablaLogAdmin"><thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th></tr></thead><tbody></tbody></table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // --- Data load ---
+    const usuarioActivoEl = document.getElementById('usuarioActivo');
+    const btnLogout = document.getElementById('btnLogout');
+    const categoriaSel = document.getElementById('categoriaSel');
+    const busqueda = document.getElementById('busqueda');
+    const formArea = document.getElementById('formArea');
+    const tablesArea = document.getElementById('tablesArea');
+    const btnNew = document.getElementById('btnNew');
+    const btnAdvancedSearch = document.getElementById('btnAdvancedSearch');
+    const searchMenu = document.getElementById('searchMenu');
+    const searchSteps = document.getElementById('searchSteps');
+    const applySearchBtn = document.getElementById('applySearch');
+    const cancelSearchBtn = document.getElementById('cancelSearch');
+    const adminPanel = document.getElementById('adminPanel');
+
+    // ensure a sane default category to avoid rendering nothing
+    if(categoriaSel && !categoriaSel.value) categoriaSel.value = 'todas';
+
+    let inventory = {vidrio:[],aluminio:[],herrajes:[],insumos:[]};
+    // Try to load from local storage for instant render
+    try {
+        const saved = localStorage.getItem('inventory_v1');
+        if(saved) {
+            const parsed = JSON.parse(saved);
+            inventory = { ...inventory, ...parsed };
+            console.log('Loaded inventory from local storage');
+        }
+    } catch(e) { console.warn('Error loading local inventory', e); }
+
+    // No local server/proxy detection: frontend will post directly to Apps Script
+    // migrate legacy 'medida' -> 'medida1'/'medida2' for vidrio items
+    if(inventory && inventory.vidrio && Array.isArray(inventory.vidrio)){
+        inventory.vidrio.forEach(it=>{
+            if(it && !it.medida1 && it.medida){
+                const parts = it.medida.split(/x|×|,|;/i).map(s=>s.trim()).filter(Boolean);
+                it.medida1 = parts[0] || it.medida || '';
+                it.medida2 = parts[1] || '';
+            }
+        });
+    }
+    // Apps Script Web App exec URL (direct). Replace with your deployment URL if different.
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycby9RjQ5V1G2m6M2ORE6lZgkPTYPdQLbCqqxBVJL2lYPrPyeXKG34ANueQGRb1nPka7Z0g/exec';
+    // Mapear categoría UI -> id de inventario en Apps Script (ajusta según tu configuración)
+    const CATEGORY_TO_INVENTORY = { aluminio: '1', herrajes: '2', vidrio: '3', insumos: '4' };
+
+    // Templates (campos por categoría)
+    const templates = {
+        vidrio: ['image','tipo','color','grosor','forma','medida1','medida2','cantidad'],
+        aluminio: ['image','linea','serie','nombre','color','codigo','cantidad'],
+        herrajes: ['image','nombre','color','codigo','cantidad'],
+        insumos: ['image','nombre','tipo','color','codigo','cantidad']
+    };
+
+    // Sync categories from this frontend templates -> Apps Script
+    async function syncCategoriesToGAS(){
+        try{
+            const mapping = {};
+            // build inventoryId -> [categories]
+            Object.keys(templates).forEach(cat => {
+                const inv = CATEGORY_TO_INVENTORY[cat] || null;
+                if(!inv) return;
+                mapping[inv] = mapping[inv] || [];
+                if(!mapping[inv].includes(cat)) mapping[inv].push(cat);
+            });
+            // send to Apps Script as urlencoded form to avoid CORS preflight
+            const body = new URLSearchParams({ syncCategories: '1', categories: JSON.stringify(mapping) }).toString();
+            await fetch(GAS_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }, body });
+            console.log('Categories synced to Apps Script', mapping);
+        }catch(err){ console.warn('Sync categories to GAS failed', err); }
+    }
+
+    // --- Fetch inventory from Apps Script ---
+    async function loadInventoryForCategory(cat){
+        try{
+            const invId = CATEGORY_TO_INVENTORY[cat];
+            if(!invId) return;
+            // use JSONP to avoid CORS from static hosts
+            const url = GAS_URL + '?action=list&inventory=' + encodeURIComponent(invId);
+            const j = await jsonpFetch(url);
+            if(!j || !j.ok || !Array.isArray(j.rows)){
+                console.warn('No rows returned for',cat,j);
+                inventory[cat] = [];
+                return;
+            }
+            // Map sheet rows to frontend item shape
+            const rows = j.rows.map(r => {
+                const lower = {}; Object.keys(r||{}).forEach(k=> lower[String(k).toLowerCase()] = r[k]);
+                let notesObj = null; try{ notesObj = r.notes ? (typeof r.notes==='string' ? JSON.parse(r.notes) : r.notes) : null; }catch(e){}
+                const pick = (...keys)=>{ 
+                    for(const k of keys){ 
+                        const lk=String(k||'').toLowerCase(); 
+                        // 1. Direct match in row object
+                        if(r[k]!==undefined) return r[k]; 
+                        // 2. Match in lower-cased keys map
+                        if(lower[lk]!==undefined) return lower[lk]; 
+                        // 3. Match in notes object
+                        if(notesObj && notesObj[k]!==undefined) return notesObj[k]; 
+                        if(notesObj && notesObj[lk]!==undefined) return notesObj[lk];
+                        
+                        // 4. Fuzzy match in lower-cased keys (e.g. 'ancho' matches 'ancho (mm)')
+                        const fuzzyKey = Object.keys(lower).find(key => key.includes(lk));
+                        if(fuzzyKey) return lower[fuzzyKey];
+                    } 
+                    return ''; 
+                };
+                const item = Object.assign({}, r);
+                // Merge notesObj into item to ensure all fields are available at top level
+                if(notesObj) Object.assign(item, notesObj);
+
+                item.timestamp = pick('timestamp','fecha','date');
+                item.inventoryId = pick('inventoryId','inventario');
+                item.category = pick('category','categoria') || cat;
+                item.nombre = pick('nombre','name','linea','tipo','forma');
+                item.codigo = pick('codigo','sku','serie','tipo','forma','id','referencia');
+                item.cantidad = parseInt(pick('quantity','cantidad','qty','stock','existencia') || 0) || 0;
+                item.notes = r.notes || '';
+                item.imageUrl = pick('imageUrl','image','imagen','url','foto');
+                
+                // Specific field mapping for known categories to ensure they are populated
+                if(cat === 'vidrio'){
+                    item.medida1 = pick('medida1','ancho','width','base');
+                    item.medida2 = pick('medida2','alto','largo','height','length','altura');
+                    item.grosor = pick('grosor','thickness','calibre','espesor','mm');
+                }
+                
+                // hydrate template fields if missing
+                (templates[cat]||[]).forEach(f=>{ if(item[f]===undefined || item[f]===null || item[f]===''){ item[f] = pick(f); } });
+                item.id = item.codigo || item.timestamp || makeId();
+                return item;
+            });
+            inventory[cat] = rows;
+        }catch(err){ 
+            console.error('loadInventoryForCategory failed',cat,err); 
+            // Do NOT clear inventory on error, keep local copy
+            // inventory[cat]=[]; 
+        }
+    }
+
+    // Update quantity on Sheets by sku (uses action=update)
+    async function updateQuantityRemote(cat, item, newQty){
+        try{
+            const invId = CATEGORY_TO_INVENTORY[cat];
+            if(!invId) throw new Error('Inventory id not mapped for '+cat);
+            // Use the most reliable ID available for SKU
+            const skuVal = item.codigo || item.sku || item.nombre || '';
+            if(!skuVal) throw new Error('Item does not have a SKU/Code');
+
+            // use JSONP GET-based update (Apps Script supports GET update when called this way)
+            const user = localStorage.getItem('activo') || 'Anonimo';
+            const actionDetails = `Cambio de stock: ${item.nombre || item.sku} a ${newQty}`;
+            const url = GAS_URL + '?action=update&inventory=' + encodeURIComponent(invId) + '&sku=' + encodeURIComponent(skuVal) + '&quantity=' + encodeURIComponent(String(newQty)) + '&user=' + encodeURIComponent(user) + '&actionDetails=' + encodeURIComponent(actionDetails);
+            
+            console.log('Updating remote:', url);
+            const j = await jsonpFetch(url);
+            
+            if(j && j.ok){
+                console.log('Update success:', j);
+                try{ await loadInventoryForCategory(cat); }catch(e){ console.warn('Reload after update failed',e); }
+                return true;
+            }
+            throw new Error((j && j.error) ? j.error : 'Update failed (unknown error)');
+        }catch(err){ 
+            console.error('updateQuantityRemote failed',err); 
+            alert('Error al actualizar cantidad: ' + err.message);
+            throw err; 
+        }
+    }
+
+    // JSONP helper: returns parsed JSON
+    function jsonpFetch(url, timeout = 8000){
+        return new Promise((resolve, reject)=>{
+            const cbName = '__cb' + Math.random().toString(36).slice(2,10);
+            const timer = setTimeout(()=>{ window[cbName] = ()=>{}; reject(new Error('JSONP timeout')); }, timeout);
+            window[cbName] = function(data){ clearTimeout(timer); try{ resolve(data); }catch(e){ reject(e); } finally{ try{ script.parentNode.removeChild(script); }catch(e){} delete window[cbName]; } };
+            const sep = url.indexOf('?') === -1 ? '?' : '&';
+            const script = document.createElement('script'); script.src = url + sep + 'callback=' + cbName; script.onerror = ()=>{ clearTimeout(timer); delete window[cbName]; script.parentNode.removeChild(script); reject(new Error('JSONP load error')); };
+            document.head.appendChild(script);
+        });
+    }
+
+    // helper: all categories list
+    const allCategories = Object.keys(templates);
+
+    // Populate filterField options based on selected category (or all)
+    const filterField = document.getElementById('filterField');
+    function populateFilterOptions(selectedCat){
+        const opts = new Set();
+        opts.add('Todos');
+        opts.add('categoria');
+        if(!selectedCat || selectedCat==='todas' || selectedCat==='agotados'){
+            allCategories.forEach(cat=> templates[cat].forEach(f=>opts.add(f)));
+        }else if(templates[selectedCat]){
+            templates[selectedCat].forEach(f=>opts.add(f));
+        }
+        // clear and append
+        filterField.innerHTML = '';
+        Array.from(opts).forEach(o=>{
+            const op = document.createElement('option'); op.value = o; op.innerText = o=== 'Todos' ? 'Todos (buscar en todos los campos)' : o;
+            filterField.appendChild(op);
+        });
+    }
+
+    // --- Minimal app state helpers (define commonly used globals) ---
+    const activo = localStorage.getItem('activo') || null;
+    let usuarios = JSON.parse(localStorage.getItem('usuarios_v1') || '{}');
+    let log = JSON.parse(localStorage.getItem('log_v1') || '[]');
+
+    function saveInventory(){
+        try{
+            // Avoid storing image data (base64 or data URLs) in localStorage to prevent quota exceed.
+            const safeCopy = {};
+            Object.keys(inventory).forEach(cat => {
+                safeCopy[cat] = (inventory[cat] || []).map(it => {
+                    if(!it || typeof it !== 'object') return it;
+                    const c = Object.assign({}, it);
+                    delete c.imageData;
+                    delete c.imageBase64;
+                    return c;
+                });
+            });
+            localStorage.setItem('inventory_v1', JSON.stringify(safeCopy));
+        }catch(e){ console.warn('saveInventory failed',e); }
+    }
+    function saveUsers(){ try{ localStorage.setItem('usuarios_v1', JSON.stringify(usuarios)); }catch(e){ console.warn('saveUsers failed',e); } }
+    function saveLog(){ try{ localStorage.setItem('log_v1', JSON.stringify(log)); }catch(e){ console.warn('saveLog failed',e); } }
+
+    function makeId(){ return 'id_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8); }
+
+    // --- Advanced search UI ---
+    function openAdvancedSearch(){
+        searchSteps.innerHTML = '';
+        searchMenu.classList.remove('hidden');
+        // Step 1: choose category (or 'todas' -> then choose specific)
+        const step1 = document.createElement('div'); step1.style.marginBottom='8px';
+        const lbl1 = document.createElement('label'); lbl1.innerText='Paso 1: Seleccione categoría:'; step1.appendChild(lbl1);
+        const sel1 = document.createElement('select'); sel1.style.width='100%';
+        sel1.dataset.catchooser = '1'; // <-- marcado para identificar el selector principal
+        const opAll = document.createElement('option'); opAll.value='todas'; opAll.innerText='Todas'; sel1.appendChild(opAll);
+        allCategories.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.innerText=c; sel1.appendChild(o); });
+        sel1.value = categoriaSel.value || 'todas';
+        step1.appendChild(sel1); searchSteps.appendChild(step1);
+
+        // placeholder for step 2 (fields)
+        const step2 = document.createElement('div'); step2.id='searchStepFields'; searchSteps.appendChild(step2);
+
+        function handleCatChange(){
+            const cat = sel1.value;
+            buildFieldSelectors(cat);
+        }
+        sel1.addEventListener('change', handleCatChange);
+        // initial build
+        buildFieldSelectors(sel1.value);
+    }
+
+    function buildFieldSelectors(cat){
+        const container = document.getElementById('searchStepFields'); container.innerHTML='';
+        if(cat==='todas'){
+            // ask user to pick one category to filter fields
+            const p = document.createElement('div'); const lbl = document.createElement('label'); lbl.innerText='Seleccione una categoría para definir los campos:'; p.appendChild(lbl);
+            const sel = document.createElement('select'); sel.style.width='100%';
+            sel.dataset.catchooser = '1'; // <-- marcado para identificar este selector también
+            allCategories.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.innerText=c; sel.appendChild(o); });
+            p.appendChild(sel); container.appendChild(p);
+            sel.addEventListener('change', ()=> buildFieldSelectors(sel.value));
+            return;
+        }
+        // Step: for each field in templates[cat], create dropdown of unique values + 'Cualquiera' + 'Personalizado'
+        const fields = templates[cat] || [];
+        fields.forEach(fieldName=>{
+            const row = document.createElement('div'); row.style.marginBottom='6px';
+            const lbl = document.createElement('label'); lbl.innerText = `Campo: ${fieldName}`; row.appendChild(lbl);
+            const sel = document.createElement('select'); sel.style.width='100%'; sel.dataset.field = fieldName;
+            const any = document.createElement('option'); any.value='__ANY__'; any.innerText='Cualquiera'; sel.appendChild(any);
+            const custom = document.createElement('option'); custom.value='__CUSTOM__'; custom.innerText='Personalizado...'; sel.appendChild(custom);
+            // collect unique values from inventory
+            const values = new Set(); (inventory[cat]||[]).forEach(it=>{ const v = it[fieldName]; if(v!==undefined && v!==null && v!=='' ) values.add(v.toString()); });
+            Array.from(values).sort().forEach(v=>{ const o=document.createElement('option'); o.value=v; o.innerText=v; sel.appendChild(o); });
+            row.appendChild(sel);
+            // custom input (hidden)
+            const inp = document.createElement('input'); inp.style.display='none'; inp.placeholder='Valor personalizado'; inp.style.width='100%'; inp.dataset.field = fieldName;
+            sel.addEventListener('change', ()=>{ if(sel.value==='__CUSTOM__') inp.style.display='block'; else inp.style.display='none'; });
+            row.appendChild(inp);
+            container.appendChild(row);
+        });
+    }
+
+    function applyAdvancedSearch(){
+        // read chosen category selector (use marker to avoid ambiguity)
+        const selCat = searchSteps.querySelector('select[data-catchooser]') || searchSteps.querySelector('select');
+        if(!selCat) return;
+        let chosenCat = selCat.value;
+        const stepFields = document.getElementById('searchStepFields');
+        // if chosenCat is 'todas' and there's an inner category selector marked, use it
+        if(chosenCat==='todas'){
+            const innerCat = stepFields.querySelector('select[data-catchooser]');
+            if(innerCat) chosenCat = innerCat.value;
+        }
+        // gather criteria
+        const criteria = { category: chosenCat, conditions: {} };
+        const selects = stepFields.querySelectorAll('select');
+        selects.forEach(s=>{
+            const f = s.dataset.field;
+            if(!f) return; // skip category chooser
+            if(s.value && s.value!=='__ANY__'){
+                if(s.value==='__CUSTOM__'){
+                    const inp = stepFields.querySelector(`input[data-field="${f}"]`);
+                    if(inp && inp.value.trim()!=='') criteria.conditions[f]=inp.value.trim();
+                } else {
+                    criteria.conditions[f]=s.value;
+                }
+            }
+        });
+        // hide modal
+        searchMenu.classList.add('hidden');
+        // render results using criteria
+        renderTableWithCriteria(criteria);
+    }
+
+    function cancelSearch(){ searchMenu.classList.add('hidden'); }
+
+    // Render using advanced criteria object {category, conditions}
+    function renderTableWithCriteria(criteria){
+        if(!criteria || !criteria.category) return;
+        const cat = criteria.category;
+        tablesArea.innerHTML='';
+        const renderCategory = (c)=>{
+            if(!templates[c]) return;
+            const cont = document.createElement('div'); cont.className='container';
+            const h = document.createElement('h3'); h.innerText = c.toUpperCase(); cont.appendChild(h);
+            const tbl = document.createElement('table');
+            const thead = document.createElement('thead'); const hr = document.createElement('tr');
+            templates[c].forEach(col=>{ const th=document.createElement('th'); th.innerText=col.toUpperCase(); hr.appendChild(th); });
+            const tha = document.createElement('th'); tha.innerText='ACCIONES'; hr.appendChild(tha); thead.appendChild(hr); tbl.appendChild(thead);
+            const tbody = document.createElement('tbody');
+            (inventory[c]||[]).forEach(item=>{
+                try{
+                    let ok=true;
+                    for(const f in criteria.conditions){
+                        const want = criteria.conditions[f].toString().toLowerCase();
+                        const have = (item[f]||'').toString().toLowerCase();
+                        if(!have.includes(want)){ ok=false; break; }
+                    }
+                    if(!ok) return;
+                    const tr = document.createElement('tr');
+                    templates[c].forEach(key=>{
+                        const td = document.createElement('td');
+                        if(key==='image'){
+                            const src = item.imageUrl || item.imageData;
+                            if(src){ const img=document.createElement('img'); img.src=src; img.style.height='40px'; td.appendChild(img); }
+                            else if(item.imageName) td.innerText = item.imageName; else td.innerText = '-';
+                        } else td.innerText = item[key] || '';
+                        tr.appendChild(td);
+                    });
+                    const tdA = document.createElement('td'); tdA.className='actions';
+                    const inBtn = document.createElement('button'); inBtn.innerText='Entrada'; inBtn.addEventListener('click', async ()=>{ try{ const q=parseInt(prompt('Cantidad a agregar')||0); if(!q) return; const newQty = (parseInt(item.cantidad)||0) + q; await updateQuantityRemote(c, item, newQty); item.cantidad = newQty; renderTableWithCriteria(criteria); }catch(e){ console.error('Entrada error',e); alert('Error en entrada (ver consola) - '+(e.message||e)); } });
+                    const outBtn = document.createElement('button'); outBtn.innerText='Salida'; outBtn.addEventListener('click', async ()=>{ try{ const q=parseInt(prompt('Cantidad a retirar')||0); if(!q) return; if((item.cantidad||0) < q) return alert('Stock insuficiente'); const newQty = (parseInt(item.cantidad)||0) - q; await updateQuantityRemote(c, item, newQty); item.cantidad = newQty; renderTableWithCriteria(criteria); }catch(e){ console.error('Salida error',e); alert('Error en salida (ver consola) - '+(e.message||e)); } });
+                    const delBtn = document.createElement('button'); delBtn.innerText='Eliminar'; delBtn.className='btn-delete'; delBtn.addEventListener('click', ()=>{ try{ if(!confirm('Eliminar producto?')) return; inventory[c]=inventory[c].filter(x=>x.id!==item.id); saveInventory(); renderTableWithCriteria(criteria); }catch(e){ console.error('Eliminar error',e); alert('Error al eliminar (ver consola)'); } });
+                    tdA.appendChild(inBtn); tdA.appendChild(outBtn); tdA.appendChild(delBtn); tr.appendChild(tdA);
+                    tbody.appendChild(tr);
+                }catch(err){ console.error('Error renderTableWithCriteria item',item,err); }
+            });
+            if(tbody.childElementCount === 0){
+                const emptyTr = document.createElement('tr');
+                const emptyTd = document.createElement('td');
+                emptyTd.colSpan = templates[c].length + 1;
+                emptyTd.style.textAlign = 'center';
+                emptyTd.style.color = '#666';
+                emptyTd.style.padding = '12px';
+                emptyTd.innerText = 'Sin productos en esta categoría';
+                emptyTr.appendChild(emptyTd);
+                tbody.appendChild(emptyTr);
+            }
+            tbl.appendChild(tbody);
+            const wrapper = document.createElement('div'); wrapper.className = 'table-responsive';
+            wrapper.appendChild(tbl);
+            cont.appendChild(wrapper); tablesArea.appendChild(cont);
+        };
+        renderCategory(cat);
+    }
+
+    // --- Form (appears only on Add) ---
+    function renderForm(cat){
+        console.log('renderForm start',cat);
+        cat = cat || (categoriaSel? categoriaSel.value : null);
+        if(!cat){ console.error('renderForm: categoría no definida'); return; }
+        if(!templates[cat]){ console.error('renderForm: plantilla no encontrada para',cat); alert('Categoría inválida'); return; }
+        formArea.innerHTML = '';
+        formArea.classList.remove('hidden');
+        const fields = templates[cat];
+        const wrapper = document.createElement('div'); wrapper.style.display='flex'; wrapper.style.gap='8px'; wrapper.style.flexWrap='wrap';
+        const inputs = {};
+        fields.forEach(k=>{
+            const col = document.createElement('div'); col.style.display='flex'; col.style.flexDirection='column'; col.style.minWidth='140px';
+            const label = document.createElement('label'); label.innerText = k.toUpperCase();
+            col.appendChild(label);
+            // For images keep file input
+            if(k==='image'){
+                const inp = document.createElement('input'); inp.type='file'; inp.accept='image/*'; col.appendChild(inp); inputs[k]=inp;
+            } else if(k==='cantidad'){
+                const inp = document.createElement('input'); inp.type='number'; inp.min='0'; inp.value='0'; col.appendChild(inp); inputs[k]=inp;
+            } else {
+                // create select populated with unique existing values for this field in this category
+                const sel = document.createElement('select'); sel.style.width='100%';
+                const any = document.createElement('option'); any.value='__ANY__'; any.innerText='-- seleccionar sugerencia --'; sel.appendChild(any);
+                const other = document.createElement('option'); other.value='__OTHER__'; other.innerText='Personalizado...'; sel.appendChild(other);
+                // collect unique values
+                const vals = new Set(); (inventory[cat]||[]).forEach(it=>{ const v = it[k]; if(v!==undefined && v!==null && v!=='') vals.add(v.toString()); });
+                Array.from(vals).sort().forEach(v=>{ const o=document.createElement('option'); o.value=v; o.innerText=v; sel.appendChild(o); });
+                const txt = document.createElement('input'); txt.type='text'; txt.placeholder='Valor personalizado'; txt.style.display='none'; txt.style.marginTop='6px';
+                
+                // Auto-select "Personalizado" if no existing values (UX improvement)
+                if(vals.size === 0){
+                    sel.value = '__OTHER__';
+                    txt.style.display = 'block';
+                }
+
+                sel.addEventListener('change', ()=>{ if(sel.value==='__OTHER__') txt.style.display='block'; else txt.style.display='none'; });
+                col.appendChild(sel); col.appendChild(txt); inputs[k]={ select: sel, other: txt };
+            }
+            // append column wrapper for every field
+            wrapper.appendChild(col);
+        });
+        const btns = document.createElement('div'); btns.style.width='100%'; btns.style.marginTop='8px';
+        const save = document.createElement('button'); save.innerText='Guardar'; save.className='btn btn-primary'; save.onclick = async ()=>{
+            try{
+                const data = {id: makeId()};
+                let pendingFile = false;
+
+                async function finalize(){
+                    // ensure category array exists
+                    inventory[cat] = inventory[cat] || [];
+                    const arr = inventory[cat];
+                    let dup = -1;
+                    arr.forEach((it,i)=>{
+                        if(cat==='vidrio'){
+                            if(it.tipo===data.tipo && it.color===data.color && it.grosor===data.grosor && it.forma===data.forma && it.medida1===data.medida1 && it.medida2===data.medida2) dup=i;
+                        }else if(cat==='aluminio'){
+                            if(it.linea===data.linea && it.serie===data.serie && it.nombre===data.nombre && it.codigo===data.codigo) dup=i;
+                        }else if(cat==='herrajes'){
+                            if(it.nombre===data.nombre && it.codigo===data.codigo) dup=i;
+                        }else if(cat==='insumos'){
+                            if(it.nombre===data.nombre && it.tipo===data.tipo && it.codigo===data.codigo) dup=i;
+                        }
+                    });
+
+                    // Send to Apps Script as URL-encoded form (image as base64 field). On error, save locally.
+                    // Clean data for notes: ONLY keep user notes, do not dump all data there
+                    // This prevents "stacking" of data in the notes column
+                    const userNotes = data.notes || '';
+
+                    // Ensure specific fields are present in top-level payload for Code.gs to pick up
+                    const explicitFields = {};
+                    if(cat === 'vidrio'){
+                        explicitFields.medida1 = data.medida1 || '';
+                        explicitFields.medida2 = data.medida2 || '';
+                        explicitFields.grosor = data.grosor || '';
+                        explicitFields.tipo = data.tipo || '';
+                        explicitFields.color = data.color || '';
+                        explicitFields.forma = data.forma || '';
+                    } else if(cat === 'aluminio'){
+                        explicitFields.linea = data.linea || '';
+                        explicitFields.serie = data.serie || '';
+                        explicitFields.nombre = data.nombre || '';
+                        explicitFields.color = data.color || '';
+                    } else if(cat === 'herrajes'){
+                        explicitFields.nombre = data.nombre || '';
+                        explicitFields.codigo = data.codigo || '';
+                        explicitFields.color = data.color || '';
+                    } else if(cat === 'insumos'){
+                        explicitFields.nombre = data.nombre || '';
+                        explicitFields.tipo = data.tipo || '';
+                        explicitFields.color = data.color || '';
+                    }
+
+                    try{
+                        const invId = CATEGORY_TO_INVENTORY[cat] || '1';
+                        
+                        // Generate a simple SKU if one isn't provided (avoid long composite strings)
+                        let generatedSku = data.codigo || data.sku || '';
+                        if(!generatedSku){
+                             // Use a simple ID to avoid visual clutter/duplication
+                             generatedSku = makeId().toUpperCase();
+                        }
+                        data.codigo = generatedSku; 
+
+                        const user = localStorage.getItem('activo') || 'Anonimo';
+                        const actionDetails = `Creación: ${data.nombre || data.linea || 'Item'} (${generatedSku})`;
+
+                        const payloadObj = {
+                            action: 'create', // Explicitly define action
+                            inventory: invId,
+                            category: cat,
+                            user: user,
+                            actionDetails: actionDetails,
+                            ...data, // Spread all data fields
+                            ...explicitFields, // Override/Ensure explicit fields
+                            name: data.nombre || data.linea || data.tipo || data.forma || 'Item',
+                            sku: generatedSku,
+                            quantity: data.cantidad || 0,
+                            notes: userNotes, // ONLY user notes, not the whole object
+                            imageBase64: data.imageBase64 || '',
+                            imageName: data.imageName || '',
+                            imageMime: data.imageMime || 'image/png'
+                        };
+                        const bodyStr = new URLSearchParams(payloadObj).toString();
+                        console.log('Sending urlencoded payload to GAS:', GAS_URL, payloadObj);
+                        const res = await fetch(GAS_URL, { method: 'POST', headers: {'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'}, body: bodyStr });
+                        console.log('GAS response status:', res.status, res.statusText);
+                        
+                        // Handle opaque response or text response
+                        const txt = await res.text();
+                        console.log('GAS response body:', txt);
+                        let j = {};
+                        try{ j = txt ? JSON.parse(txt) : {}; }catch(err){ console.warn('Invalid JSON from GAS', err, txt); }
+                        
+                        if((j && j.ok) || res.status === 200){
+                            // reload authoritative data from Sheets for this category
+                            try{
+                                await loadInventoryForCategory(cat);
+                                alert('Producto agregado correctamente.');
+                            }catch(e){
+                                // fallback to local update if reload fails
+                                if(dup>=0){ arr[dup].cantidad = (parseInt(arr[dup].cantidad)||0) + (parseInt(data.cantidad)||0); alert('Duplicado: cantidad sumada (local).'); }
+                                else { arr.push(data); alert('Producto agregado (local).'); }
+                                saveInventory();
+                            }
+                            renderTable(cat, busqueda.value);
+                        } else {
+                            const msg = (j && j.error) ? j.error : (txt || ('HTTP ' + res.status));
+                            console.warn('GAS returned error:', msg);
+                            // If it's a CORS error we might not even get here, but if we do and it's an error:
+                            throw new Error(msg);
+                        }
+                    }catch(e){
+                        console.warn('Enviar item al servidor falló (posible CORS o error de red), guardando localmente',e);
+                        // Assume success for user experience if it was likely a CORS issue on a successful POST
+                        if(dup>=0){ arr[dup].cantidad = (parseInt(arr[dup].cantidad)||0) + (parseInt(data.cantidad)||0); }
+                        else { arr.push(data); }
+                        alert('Producto guardado (modo offline/local por error de red).');
+                        saveInventory(); 
+                        renderTable(cat, busqueda.value);
+                    }
+
+                    formArea.classList.add('hidden');
+                }
+
+                // collect fields and handle image conversion
+                function fileToDataURL(file){
+                    return new Promise((resolve, reject)=>{
+                        const reader = new FileReader();
+                        reader.onload = e => resolve(e.target.result);
+                        reader.onerror = e => reject(e);
+                        reader.readAsDataURL(file);
+                    });
+                }
+
+                for(const k of fields){
+                    if(k==='image'){
+                        const f = inputs[k] && inputs[k].files && inputs[k].files[0];
+                        if(f){
+                            pendingFile = true;
+                            try{
+                                const dataUrl = await fileToDataURL(f);
+                                data.imageData = dataUrl; // data URL for immediate preview/local storage
+                                const base64 = dataUrl.split(',')[1] || '';
+                                data.imageBase64 = base64;
+                                data.imageName = f.name;
+                                data.imageMime = f.type || 'image/png';
+                            }catch(err){ console.warn('File read failed',err); }
+                            pendingFile = false;
+                        }
+                    } else if(k==='cantidad'){
+                        const el = inputs[k]; data[k] = parseInt((el && el.value) || 0) || 0;
+                    } else {
+                        const obj = inputs[k];
+                        let val = '';
+                        if(obj){
+                            if(obj.select){ const selv = obj.select.value; if(selv==='__OTHER__') val = (obj.other.value||''); else if(selv==='__ANY__') val = ''; else val = selv; }
+                            else if(obj.value!==undefined) val = obj.value || '';
+                        }
+                        data[k] = val;
+                    }
+                }
+
+                if(!pendingFile) await finalize();
+            }catch(err){ console.error('Error en guardar nuevo producto',err); alert('Error al guardar (ver consola)'); }
+        };
+        const cancel = document.createElement('button'); cancel.innerText='Cancelar'; cancel.className='btn btn-outline'; cancel.onclick=()=>{ formArea.classList.add('hidden'); };
+        btns.appendChild(save); btns.appendChild(cancel); wrapper.appendChild(btns); formArea.appendChild(wrapper);
+    }
+
+    // Helper to convert Drive viewer URLs to direct image links
+    function formatGoogleDriveUrl(url){
+        if(!url) return '';
+        if(url.startsWith('data:')) return url; 
+        // Extract ID from: https://drive.google.com/file/d/ID/view...
+        const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+        if(match && match[1]) return `https://lh3.googleusercontent.com/d/${match[1]}`;
+        return url;
+    }
+
+    // --- Table rendering ---
+    function renderTable(cat, filter=''){
+        try {
+            console.log('renderTable start',cat,filter);
+            const field = filterField? filterField.value : 'Todos';
+            const q = (filter||'').toString().trim().toLowerCase();
+            tablesArea.innerHTML = '';
+            const renderCategory = (c)=>{
+                if(!templates[c]) return;
+                const cont = document.createElement('div'); cont.className='container';
+                const h = document.createElement('h3'); h.innerText = c.toUpperCase(); cont.appendChild(h);
+                const tbl = document.createElement('table');
+                const thead = document.createElement('thead'); const hr = document.createElement('tr');
+                templates[c].forEach(col=>{ const th=document.createElement('th'); th.innerText=col.toUpperCase(); hr.appendChild(th); });
+                const tha = document.createElement('th'); tha.innerText='ACCIONES'; hr.appendChild(tha); thead.appendChild(hr); tbl.appendChild(thead);
+                const tbody = document.createElement('tbody');
+                (inventory[c]||[]).forEach(item=>{
+                    try{
+                        // Special filter for 'agotados'
+                        if(cat === 'agotados' && (parseInt(item.cantidad)||0) > 0) return;
+
+                        // match depending on selected field
+                        let match = true;
+                        if(q){
+                            if(field==='Todos'){
+                                const text = (Object.values(item).join(' ') + ' ' + c).toLowerCase(); match = text.includes(q);
+                            } else if(field==='categoria'){
+                                match = c.toLowerCase().includes(q);
+                            } else {
+                                const val = (item[field] || '').toString().toLowerCase(); match = val.includes(q);
+                            }
+                        }
+                        if(!match) return;
+                        const tr = document.createElement('tr');
+                        templates[c].forEach(key=>{
+                            const td = document.createElement('td');
+                            if(key==='image'){
+                                let src = item.imageUrl || item.imageData;
+                                src = formatGoogleDriveUrl(src);
+                                if(src){ 
+                                    const img=document.createElement('img'); 
+                                    img.src=src; 
+                                    img.style.height='40px'; 
+                                    img.style.objectFit='contain';
+                                    img.style.borderRadius='4px';
+                                    const a = document.createElement('a');
+                                    a.href = src;
+                                    a.target = '_blank';
+                                    a.appendChild(img);
+                                    td.appendChild(a); 
+                                }
+                                else if(item.imageName) td.innerText = item.imageName; else td.innerText = '-';
+                            } else if(key==='cantidad'){
+                                const qty = parseInt(item[key]) || 0;
+                                td.innerText = qty;
+                                if(qty === 0){
+                                    td.style.color = '#ef4444';
+                                    td.style.fontWeight = 'bold';
+                                    td.innerHTML += ' <span title="Agotado">⚠️</span>';
+                                    tr.style.backgroundColor = '#fff1f2'; // Light red background for the row
+                                }
+                            } else td.innerText = item[key] || '';
+                            tr.appendChild(td);
+                        });
+                        const tdA = document.createElement('td'); tdA.className='actions';
+                        const inBtn = document.createElement('button'); inBtn.innerText='Entrada'; inBtn.className='btn-entry';
+                        inBtn.addEventListener('click', async ()=>{ try{ const q=parseInt(prompt('Cantidad a agregar')||0); if(!q) return; const newQty = (parseInt(item.cantidad)||0) + q; await updateQuantityRemote(c, item, newQty); item.cantidad = newQty; renderTable(categoriaSel.value, busqueda.value); }catch(e){ console.error('Entrada error',e); alert('Error en entrada (ver consola) - '+(e.message||e)); } });
+                        const outBtn = document.createElement('button'); outBtn.innerText='Salida'; outBtn.className='btn-exit';
+                        outBtn.addEventListener('click', async ()=>{ try{ const q=parseInt(prompt('Cantidad a retirar')||0); if(!q) return; if((item.cantidad||0) < q) return alert('Stock insuficiente'); const newQty = (parseInt(item.cantidad)||0) - q; await updateQuantityRemote(c, item, newQty); item.cantidad = newQty; renderTable(categoriaSel.value, busqueda.value); }catch(e){ console.error('Salida error',e); alert('Error en salida (ver consola) - '+(e.message||e)); } });
+                        
+                        tdA.appendChild(inBtn); tdA.appendChild(outBtn); tr.appendChild(tdA);
+                        tbody.appendChild(tr);
+                    }catch(err){ console.error('Error renderTable item',item,err); }
+                });
+                if(tbody.childElementCount === 0){
+                    const emptyTr = document.createElement('tr');
+                    const emptyTd = document.createElement('td');
+                    emptyTd.colSpan = templates[c].length + 1;
+                    emptyTd.style.textAlign = 'center';
+                    emptyTd.style.color = '#666';
+                    emptyTd.style.padding = '12px';
+                    emptyTd.innerText = 'Sin productos en esta categoría';
+                    emptyTr.appendChild(emptyTd);
+                    tbody.appendChild(emptyTr);
+                }
+                tbl.appendChild(tbody);
+                const wrapper = document.createElement('div'); wrapper.className = 'table-responsive';
+                wrapper.appendChild(tbl);
+                cont.appendChild(wrapper); tablesArea.appendChild(cont);
+            };
+
+            if(!cat || cat==='todas' || cat==='agotados'){
+                allCategories.forEach(c=> renderCategory(c));
+            } else {
+                if(!templates[cat]){ console.warn('renderTable: categoría inválida, mostrando todas'); allCategories.forEach(c=> renderCategory(c)); return; }
+                renderCategory(cat);
+            }
+        } catch(err) {
+            console.error('renderTable fallo', err);
+            tablesArea.innerHTML = '<div style="padding:12px;background:#fff3f3;border-radius:6px;color:#900">Error al renderizar tablas. Revisa la consola (F12).</div>';
+        }
+    }
+
+    // --- Admin functions ---
+    function actualizarUsuariosAdmin(){
+        const tbody = document.querySelector('#tablaUsuariosAdmin tbody'); tbody.innerHTML='';
+        for(const u in usuarios){ if(u==='admin') continue; const tr = document.createElement('tr'); const td1=document.createElement('td'); td1.innerText=u; const td2=document.createElement('td'); td2.innerText = usuarios[u].autorizado? 'Autorizado':'Pendiente'; const td3=document.createElement('td'); const b1=document.createElement('button'); b1.innerText='✔'; b1.onclick=()=>{ usuarios[u].autorizado=true; log.push({fecha:new Date().toLocaleString(),usuario:'admin',accion:'Autorizó '+u}); saveUsers(); saveLog(); actualizarUsuariosAdmin(); actualizarLogAdmin(); }; const b2=document.createElement('button'); b2.innerText='✖'; b2.onclick=()=>{ usuarios[u].autorizado=false; log.push({fecha:new Date().toLocaleString(),usuario:'admin',accion:'Bloqueó '+u}); saveUsers(); saveLog(); actualizarUsuariosAdmin(); actualizarLogAdmin(); }; td3.appendChild(b1); td3.appendChild(b2); tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tbody.appendChild(tr); }
+    }
+    function actualizarLogAdmin(){ const tbody = document.querySelector('#tablaLogAdmin tbody'); tbody.innerHTML=''; log.forEach(l=>{ const tr=document.createElement('tr'); const td1=document.createElement('td'); td1.innerText=l.fecha; const td2=document.createElement('td'); td2.innerText=l.usuario; const td3=document.createElement('td'); td3.innerText=l.accion; tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tbody.appendChild(tr); }); }
+
+    try{
+        const exportLogBtn = document.getElementById('exportLogCSV');
+        if(exportLogBtn) exportLogBtn.addEventListener('click', ()=>{ let csv='Fecha,Usuario,Accion\n'; log.forEach(l=> csv += `${l.fecha},${l.usuario},${l.accion}\n`); const a=document.createElement('a'); a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv); a.download='bitacora_bodega.csv'; a.click(); });
+        else console.warn('exportLogCSV button missing');
+
+        if(!categoriaSel) console.error('categoriaSel missing');
+        categoriaSel.addEventListener('change', async ()=>{ 
+            try{ 
+                console.log('categoria changed to',categoriaSel.value); 
+                formArea.classList.add('hidden'); 
+                
+                // Show status
+                const statusEl = document.getElementById('syncStatus');
+                if(statusEl) { statusEl.innerText='Cargando...'; statusEl.style.display='block'; statusEl.style.background='#333'; }
+
+                // Render local data first
+                renderTable(categoriaSel.value, busqueda.value);
+                populateFilterOptions(categoriaSel.value); 
+
+                if(categoriaSel.value === 'todas' || categoriaSel.value === 'agotados'){ 
+                    for(const cat of allCategories){
+                        await loadInventoryForCategory(cat);
+                        renderTable(categoriaSel.value, busqueda.value);
+                    }
+                } else { 
+                    await loadInventoryForCategory(categoriaSel.value); 
+                    renderTable(categoriaSel.value, busqueda.value);
+                } 
+                
+                if(statusEl) { statusEl.innerText='Sincronizado'; setTimeout(()=>{ statusEl.style.display='none'; }, 1500); }
+                
+            }catch(e){ console.error('categoria change handler failed',e); } 
+        });
+        busqueda.addEventListener('input', ()=>{ console.log('busqueda', busqueda.value); renderTable(categoriaSel.value, busqueda.value); });
+        filterField.addEventListener('change', ()=>{ console.log('filterField', filterField.value); renderTable(categoriaSel.value, busqueda.value); });
+        btnAdvancedSearch.addEventListener('click', ()=>{ openAdvancedSearch(); });
+        applySearchBtn.addEventListener('click', ()=>{ applyAdvancedSearch(); });
+        cancelSearchBtn.addEventListener('click', ()=>{ cancelSearch(); });
+        btnNew.addEventListener('click', ()=>{ console.log('btnNew clicked for',categoriaSel.value); const catSel = categoriaSel.value; if(!catSel || catSel==='todas'){ alert('Seleccione una categoría específica antes de agregar un producto.'); return; } renderForm(catSel); });
+        btnLogout.addEventListener('click', ()=>{ try{ localStorage.removeItem('activo'); location.href='index.html'; }catch(e){ console.error('logout error',e); } });
+    }catch(err){ console.error('Error wiring events',err); }
+
+    // --- Init ---
+    if(!activo){ alert('No estás autenticado'); location.href='index.html'; }
+    usuarioActivoEl.innerText = activo;
+    if(activo==='admin'){ adminPanel.classList.remove('hidden'); actualizarUsuariosAdmin(); actualizarLogAdmin(); }
+    // populate filter options and initial render (protegido)
+    try{
+        populateFilterOptions(categoriaSel.value);
+        
+        // 1. Render immediately with local data (Instant Load)
+        renderTable(categoriaSel.value, busqueda.value);
+
+        // attempt to sync categories with Apps Script (best-effort)
+        try{ syncCategoriesToGAS(); }catch(e){}
+        
+        // 2. Fetch fresh data in background and re-render
+        try{
+            // Create status indicator
+            const statusEl = document.createElement('div');
+            statusEl.id = 'syncStatus';
+            statusEl.style.cssText = 'position:fixed;bottom:10px;right:10px;background:#333;color:#fff;padding:6px 12px;border-radius:4px;font-size:12px;opacity:0.9;z-index:9999;display:none;box-shadow:0 2px 5px rgba(0,0,0,0.2);';
+            statusEl.innerText = 'Sincronizando...';
+            document.body.appendChild(statusEl);
+
+            (async ()=>{
+                statusEl.style.display = 'block';
+                if(categoriaSel.value === 'todas' || categoriaSel.value === 'agotados'){
+                    // Load sequentially to avoid freezing the browser with too many requests
+                    for(const cat of allCategories){
+                        await loadInventoryForCategory(cat);
+                        // Render incrementally so user sees progress
+                        renderTable(categoriaSel.value, busqueda.value);
+                        // Small pause to let UI breathe
+                        await new Promise(r=>setTimeout(r, 50));
+                    }
+                } else {
+                    await loadInventoryForCategory(categoriaSel.value);
+                    renderTable(categoriaSel.value, busqueda.value);
+                }
+                // Save fresh data to local storage
+                saveInventory();
+                statusEl.innerText = 'Sincronizado';
+                setTimeout(()=>{ statusEl.style.display='none'; }, 2000);
+            })().catch(err=>{ 
+                console.error('Error loading inventory on init',err); 
+                statusEl.innerText = 'Error de conexión';
+                statusEl.style.background = '#900';
+                setTimeout(()=>{ statusEl.style.display='none'; }, 3000);
+            });
+        }catch(err){ console.error('Inicialización (sync) falló',err); }
+    }catch(e){
+        console.error('Inicialización falló',e);
+        // fallback: force 'todas' and render minimal UI
+        try{ categoriaSel.value='todas'; populateFilterOptions('todas'); renderTable('todas'); }catch(e2){ tablesArea.innerHTML = '<div style="padding:12px;background:#fff3f3;border-radius:6px;color:#900">No se pudieron mostrar las tablas. Ver consola.</div>'; }
+    }
+
+    </script>
+
+</body>
+</html>
