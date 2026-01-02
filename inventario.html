@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Inventario - Aluoferta</title>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <link rel="stylesheet" href="styles.css">
     <style>
         /* Loading Overlay */
@@ -113,6 +114,9 @@
                 </select>
             </div>
             <div style="display:flex;gap:8px;align-items:flex-end;">
+                <button id="btnCameraScan" class="btn btn-outline" style="border-color: #3b82f6; color: #3b82f6;">
+                    📷 Salida Rápida
+                </button>
                 <button id="btnAdvancedSearch" class="btn btn-outline">Filtros</button>
                 <button id="btnNew" class="btn btn-primary">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 5v14M5 12h14"/></svg>
@@ -131,6 +135,24 @@
             <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
                 <button id="cancelSearch" class="btn btn-outline">Cancelar</button>
                 <button id="applySearch" class="btn btn-primary">Aplicar filtros</button>
+            </div>
+        </div>
+
+        <!-- Camera Scanner Modal -->
+        <div id="cameraScanModal" class="modal hidden" style="max-width: 600px;">
+            <h3>📷 Salida Rápida por Cámara</h3>
+            <div id="reader" style="width: 100%; min-height: 300px; background: #000;"></div>
+            <div id="scanResult" style="margin-top: 15px; padding: 10px; background: #f0f9ff; border-radius: 4px; display: none;">
+                <h4 id="scanProductName" style="margin: 0 0 5px 0;">Producto</h4>
+                <p id="scanProductCode" style="margin: 0; color: #666; font-size: 0.9rem;">CODE</p>
+                <div style="margin-top: 10px; display: flex; gap: 10px; align-items: center;">
+                    <label>Cantidad a retirar:</label>
+                    <input type="number" id="scanQty" value="1" min="1" style="width: 80px; padding: 5px;">
+                    <button id="btnConfirmScanExit" class="btn btn-primary">Confirmar Salida</button>
+                </div>
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+                <button id="btnCloseCamera" class="btn btn-outline">Cerrar</button>
             </div>
         </div>
 
@@ -1202,6 +1224,150 @@
                 }
             });
         }
+
+        // --- Camera Scanner Logic ---
+        const btnCameraScan = document.getElementById('btnCameraScan');
+        const cameraScanModal = document.getElementById('cameraScanModal');
+        const btnCloseCamera = document.getElementById('btnCloseCamera');
+        const scanResult = document.getElementById('scanResult');
+        const scanProductName = document.getElementById('scanProductName');
+        const scanProductCode = document.getElementById('scanProductCode');
+        const scanQty = document.getElementById('scanQty');
+        const btnConfirmScanExit = document.getElementById('btnConfirmScanExit');
+        let html5QrcodeScanner = null;
+        let currentScannedItem = null;
+        let currentScannedCat = null;
+
+        function findProductByCode(code){
+            code = code.trim().toLowerCase();
+            for(const cat of allCategories){
+                const items = inventory[cat] || [];
+                const found = items.find(i => (i.codigo||'').toLowerCase() === code || (i.sku||'').toLowerCase() === code);
+                if(found) return { item: found, cat: cat };
+            }
+            return null;
+        }
+
+        async function onScanSuccess(decodedText, decodedResult) {
+            if(currentScannedItem) return; // Already processing one
+            
+            console.log(`Code matched = ${decodedText}`, decodedResult);
+            const result = findProductByCode(decodedText);
+            
+            if(result){
+                // Pause scanner
+                if(html5QrcodeScanner) html5QrcodeScanner.pause();
+                
+                currentScannedItem = result.item;
+                currentScannedCat = result.cat;
+                
+                // Show UI
+                scanResult.style.display = 'block';
+                scanProductName.innerText = currentScannedItem.nombre || 'Producto sin nombre';
+                scanProductCode.innerText = `Código: ${currentScannedItem.codigo} | Stock Actual: ${currentScannedItem.cantidad}`;
+                scanQty.value = 1;
+                scanQty.focus();
+                
+                // Play beep
+                try{ new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg').play(); }catch(e){}
+            } else {
+                // Optional: Feedback for not found
+                console.warn('Producto no encontrado localmente:', decodedText);
+                // Maybe show a toast? For now just log.
+            }
+        }
+
+        btnConfirmScanExit.addEventListener('click', async ()=>{
+            if(!currentScannedItem || !currentScannedCat) return;
+            
+            const q = parseInt(scanQty.value) || 0;
+            if(q <= 0) return alert('Cantidad inválida');
+            
+            const item = currentScannedItem;
+            const cat = currentScannedCat;
+            
+            setLoading(true, 'Procesando salida...', true);
+            try{
+                // 1. Fetch fresh data
+                const freshItem = await loadItemRemote(cat, item.codigo);
+                if(!freshItem){
+                    alert('Error: El producto no existe en el servidor.');
+                    resetScannerUI();
+                    return;
+                }
+                
+                const currentStock = parseInt(freshItem.cantidad)||0;
+                if(currentStock < q){
+                    alert(`Stock insuficiente. Stock real: ${currentStock}`);
+                    resetScannerUI();
+                    return;
+                }
+                
+                // 2. Update
+                const newQty = currentStock - q;
+                await updateQuantityRemote(cat, freshItem, newQty);
+                
+                // 3. Update local
+                item.cantidad = newQty;
+                const mainItem = (inventory[cat]||[]).find(x => x.codigo === item.codigo);
+                if(mainItem) mainItem.cantidad = newQty;
+                renderTable(categoriaSel.value, busqueda.value);
+                
+                alert('Salida registrada correctamente.');
+                resetScannerUI();
+                
+            }catch(e){
+                console.error(e);
+                alert('Error: ' + e.message);
+                resetScannerUI();
+            } finally {
+                setLoading(false);
+            }
+        });
+
+        function resetScannerUI(){
+            scanResult.style.display = 'none';
+            currentScannedItem = null;
+            currentScannedCat = null;
+            scanQty.value = 1;
+            if(html5QrcodeScanner) {
+                try{ html5QrcodeScanner.resume(); }catch(e){ console.warn('Resume failed',e); }
+            }
+        }
+
+        btnCameraScan.addEventListener('click', ()=>{
+            cameraScanModal.classList.remove('hidden');
+            startScanner();
+        });
+
+        btnCloseCamera.addEventListener('click', ()=>{
+            stopScanner();
+            cameraScanModal.classList.add('hidden');
+        });
+
+        function startScanner(){
+            if(html5QrcodeScanner) return; // Already running
+            
+            // Use html5-qrcode library
+            html5QrcodeScanner = new Html5Qrcode("reader");
+            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+            
+            html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess)
+            .catch(err => {
+                console.error("Error starting scanner", err);
+                alert("No se pudo iniciar la cámara. Asegúrese de dar permisos.");
+            });
+        }
+
+        function stopScanner(){
+            if(html5QrcodeScanner){
+                html5QrcodeScanner.stop().then(() => {
+                    html5QrcodeScanner.clear();
+                    html5QrcodeScanner = null;
+                }).catch(err => console.error("Failed to stop scanner", err));
+            }
+        }
+
         filterField.addEventListener('change', ()=>{ console.log('filterField', filterField.value); renderTable(categoriaSel.value, busqueda.value); });
         btnAdvancedSearch.addEventListener('click', ()=>{ openAdvancedSearch(); });
         applySearchBtn.addEventListener('click', ()=>{ applyAdvancedSearch(); });
