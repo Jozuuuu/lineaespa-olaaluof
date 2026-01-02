@@ -1477,76 +1477,21 @@
                 verbose: false
             });
             
+            // Configuración estable (la que funcionaba mejor)
             const config = { 
-                fps: 15, 
-                qrbox: { width: 280, height: 150 }, 
+                fps: 10, 
+                qrbox: { width: 250, height: 150 }, 
                 aspectRatio: 1.0
             };
             
-            // Estrategia de inicio escalonada:
-            // 1. Intentar HD + Enfoque Continuo (Mejor calidad)
-            // 2. Si falla, intentar solo Environment (Estándar)
-            // 3. Si falla, intentar User (Frontal)
+            // Sin restricciones avanzadas que causan pantalla negra
+            const constraints = { facingMode: "environment" };
             
-            const constraintsHD = { 
-                facingMode: "environment",
-                width: { min: 640, ideal: 1280, max: 1920 },
-                height: { min: 480, ideal: 720, max: 1080 },
-                advanced: [{ focusMode: "continuous" }]
-            };
-
-            const constraintsBasic = { facingMode: "environment" };
-            const constraintsUser = { facingMode: "user" };
-
-            // Función auxiliar para configurar UI de Zoom
-            const setupZoom = () => {
-                const zoomControls = document.getElementById('zoomControls');
-                const zoomSlider = document.getElementById('zoomSlider');
-                const zoomValue = document.getElementById('zoomValue');
-                if(zoomControls){
-                    zoomControls.style.display = 'flex';
-                    zoomSlider.value = 1;
-                    zoomValue.innerText = '1.0x';
-                    zoomSlider.oninput = () => {
-                        const val = parseFloat(zoomSlider.value);
-                        zoomValue.innerText = val + 'x';
-                        try{
-                            html5QrcodeScanner.applyVideoConstraints({ advanced: [{ zoom: val }] })
-                            .catch(e => console.warn('Zoom apply failed', e));
-                        }catch(e){}
-                    };
-                }
-            };
-
-            // Intento 1: HD
-            html5QrcodeScanner.start(constraintsHD, config, onScanSuccess)
-            .then(() => {
-                console.log("Scanner started in HD mode");
-                setupZoom();
-            })
+            html5QrcodeScanner.start(constraints, config, onScanSuccess)
             .catch(err => {
-                console.warn("HD start failed, retrying basic...", err);
-                // Intento 2: Básico
-                html5QrcodeScanner.start(constraintsBasic, config, onScanSuccess)
-                .then(() => {
-                    console.log("Scanner started in Basic mode");
-                    setupZoom();
-                })
-                .catch(err2 => {
-                     console.warn("Basic start failed, retrying user...", err2);
-                     // Intento 3: Frontal
-                     html5QrcodeScanner.start(constraintsUser, config, onScanSuccess)
-                     .then(() => {
-                         console.log("Scanner started in User mode");
-                         // Zoom suele no estar disponible en frontal, pero lo intentamos
-                         setupZoom();
-                     })
-                     .catch(err3 => {
-                         console.error("All scanner attempts failed", err3);
-                         alert("No se pudo iniciar ninguna cámara. Verifique permisos.");
-                         stopScanner();
-                     });
-                });
+                console.error("Error starting scanner", err);
+                alert("No se pudo iniciar la cámara. " + (err.message || ""));
+                stopScanner();
             });
         }
 
