@@ -66,20 +66,26 @@ app.put('/api/inventory', (req,res)=>{
 });
 
 // multer for file uploads
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const cat = (req.body.category || 'otros').toString();
-    const dir = path.join(IMAGES_DIR, cat);
-    if(!fs.existsSync(dir)) fs.mkdirSync(dir, {recursive:true});
-    cb(null, dir);
-  },
-  filename: function (req, file, cb) {
-    const ts = Date.now();
-    const safe = file.originalname.replace(/[^a-z0-9.\-\_]/gi,'_');
-    cb(null, `${ts}_${safe}`);
-  }
-});
-const upload = multer({ storage: storage });
+let upload;
+if(!isVercel){
+  const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+      const cat = (req.body.category || 'otros').toString();
+      const dir = path.join(IMAGES_DIR, cat);
+      if(!fs.existsSync(dir)) fs.mkdirSync(dir, {recursive:true});
+      cb(null, dir);
+    },
+    filename: function (req, file, cb) {
+      const ts = Date.now();
+      const safe = file.originalname.replace(/[^a-z0-9.\-\_]/gi,'_');
+      cb(null, `${ts}_${safe}`);
+    }
+  });
+  upload = multer({ storage: storage });
+} else {
+  // In serverless env do not use disk-based multer; provide a noop middleware
+  upload = (fieldName) => (req, res, next) => next();
+}
 
 // add single item (with optional image file)
 app.post('/api/item', upload.single('image'), (req,res)=>{
