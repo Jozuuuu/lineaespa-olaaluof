@@ -1327,7 +1327,26 @@
             } else {
                 // Optional: Feedback for not found
                 console.warn('Producto no encontrado localmente:', decodedText);
-                // Maybe show a toast? For now just log.
+                
+                // Mostrar feedback visual temporal en el escáner
+                const feedback = document.createElement('div');
+                feedback.style.position = 'absolute';
+                feedback.style.top = '50%';
+                feedback.style.left = '50%';
+                feedback.style.transform = 'translate(-50%, -50%)';
+                feedback.style.background = 'rgba(0,0,0,0.7)';
+                feedback.style.color = '#fff';
+                feedback.style.padding = '10px 20px';
+                feedback.style.borderRadius = '20px';
+                feedback.style.zIndex = '1000';
+                feedback.innerText = `No encontrado: ${decodedText}`;
+                
+                const reader = document.getElementById('reader');
+                if(reader) {
+                    reader.style.position = 'relative';
+                    reader.appendChild(feedback);
+                    setTimeout(()=> feedback.remove(), 2000);
+                }
             }
         }
 
@@ -1455,28 +1474,30 @@
             });
             
             const config = { 
-                fps: 10, // Volver a 10 FPS para máxima estabilidad
+                fps: 15, // 15 FPS es un buen balance
                 qrbox: { width: 280, height: 150 }, 
                 aspectRatio: 1.0
             };
             
-            // Configuración de cámara simplificada para máxima compatibilidad
-            // Eliminamos 'advanced' y 'ideal' que pueden fallar en algunos dispositivos
+            // Intentar solicitar resolución HD para leer mejor los códigos de barras
+            // Si falla, el catch intentará con configuración básica
             const constraints = { 
-                facingMode: "environment" 
+                facingMode: "environment",
+                width: { min: 640, ideal: 1280, max: 1920 },
+                height: { min: 480, ideal: 720, max: 1080 }
             };
             
             html5QrcodeScanner.start(constraints, config, onScanSuccess)
             .catch(err => {
-                console.error("Error starting scanner", err);
-                // Fallback: Intentar con cámara frontal si la trasera falla o configuración genérica
-                if(err.message && err.message.includes("OverconstrainedError")){
-                     console.log("Retrying with generic constraints...");
+                console.error("Error starting scanner with HD constraints", err);
+                // Fallback 1: Intentar sin restricciones de resolución (solo cámara trasera)
+                html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess)
+                .catch(err2 => {
+                     console.error("Error starting scanner with basic constraints", err2);
+                     alert("No se pudo iniciar la cámara trasera. Intentando frontal...");
+                     // Fallback 2: Cámara frontal/cualquiera
                      html5QrcodeScanner.start({ facingMode: "user" }, config, onScanSuccess);
-                } else {
-                    alert("No se pudo iniciar la cámara. " + (err.message || ""));
-                    stopScanner();
-                }
+                });
             });
         }
 
