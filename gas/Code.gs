@@ -68,10 +68,14 @@ function doGet(e){
         headers.forEach((h,i)=> obj[h] = r[i]);
         return obj;
       });
-      return ContentService.createTextOutput(JSON.stringify({ok:true,rows:rows})).setMimeType(ContentService.MimeType.JSON);
+      const out = {ok:true,rows:rows};
+      if(q.callback){
+        return ContentService.createTextOutput(q.callback + '(' + JSON.stringify(out) + ')').setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
     }
     // Return single row by SKU
-    if(q.action === 'get' && q.inventory && q.sku){
+      if(q.action === 'get' && q.inventory && q.sku){
       const ss = SpreadsheetApp.openById(SHEET_ID);
       const name = INVENTORY_SHEETS[q.inventory] || null;
       if(!name) return ContentService.createTextOutput(JSON.stringify({error:'Inventario inválido'})).setMimeType(ContentService.MimeType.JSON);
@@ -92,12 +96,58 @@ function doGet(e){
       });
       // also include original header names
       headers.forEach((h,i)=> obj[h] = row[i]);
-      return ContentService.createTextOutput(JSON.stringify({ok:true,row:obj})).setMimeType(ContentService.MimeType.JSON);
+      const outObj = {ok:true,row:obj};
+      if(q.callback){
+        return ContentService.createTextOutput(q.callback + '(' + JSON.stringify(outObj) + ')').setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      return ContentService.createTextOutput(JSON.stringify(outObj)).setMimeType(ContentService.MimeType.JSON);
+    }
+    // Support update via GET (useful for JSONP from static hosts)
+    if(q.action === 'update' && q.inventory && q.sku){
+      const ss = SpreadsheetApp.openById(SHEET_ID);
+      const name = INVENTORY_SHEETS[q.inventory] || null;
+      if(!name) return ContentService.createTextOutput(JSON.stringify({error:'Inventario inválido'})).setMimeType(ContentService.MimeType.JSON);
+      const sh = ss.getSheetByName(name);
+      if(!sh) return ContentService.createTextOutput(JSON.stringify({error:'Hoja no encontrada'})).setMimeType(ContentService.MimeType.JSON);
+      const data = sh.getDataRange().getValues();
+      const headers = data.shift() || [];
+      const headerMap = buildHeaderMap(headers);
+      const skuIndex = headerMap['sku'];
+      if(skuIndex === undefined || skuIndex === -1) return ContentService.createTextOutput(JSON.stringify({error:'Columna sku no encontrada'})).setMimeType(ContentService.MimeType.JSON);
+      const rowIndex = data.findIndex(r => String(r[skuIndex]) === String(q.sku));
+      if(rowIndex === -1) return ContentService.createTextOutput(JSON.stringify({error:'Fila con sku no encontrada'})).setMimeType(ContentService.MimeType.JSON);
+      // Update quantity or other provided fields (case-insensitive)
+      const payloadNormalized = {};
+      Object.keys(q).forEach(k => { payloadNormalized[String(k).trim().toLowerCase()] = q[k]; });
+      const updates = {};
+      // canonical keys
+      Object.keys(HEADER_ALIASES).forEach(canonical => {
+        if(payloadNormalized.hasOwnProperty(canonical) && headerMap[canonical] !== undefined){
+          const idx = headerMap[canonical];
+          const val = payloadNormalized[canonical];
+          sh.getRange(rowIndex + 2, idx + 1).setValue(val);
+          updates[canonical] = val;
+        }
+      });
+      // original header names
+      headers.forEach((h,i)=>{
+        const key = String(h||'').trim().toLowerCase();
+        if(payloadNormalized.hasOwnProperty(key)){
+          const val = payloadNormalized[key];
+          sh.getRange(rowIndex + 2, i + 1).setValue(val);
+          updates[h] = val;
+        }
+      });
+      return ContentService.createTextOutput(JSON.stringify({ok:true,updated:updates})).setMimeType(ContentService.MimeType.JSON);
     }
     // default: return simple info
-    return ContentService.createTextOutput(JSON.stringify({ok:true,info:'Apps Script inventory endpoint'})).setMimeType(ContentService.MimeType.JSON);
+    const info = {ok:true,info:'Apps Script inventory endpoint'};
+    if(q.callback) return ContentService.createTextOutput(q.callback + '(' + JSON.stringify(info) + ')').setMimeType(ContentService.MimeType.JAVASCRIPT);
+    return ContentService.createTextOutput(JSON.stringify(info)).setMimeType(ContentService.MimeType.JSON);
   }catch(err){
-    return ContentService.createTextOutput(JSON.stringify({error:err.message})).setMimeType(ContentService.MimeType.JSON);
+    const errObj = {error:err.message};
+    if(e && e.parameter && e.parameter.callback) return ContentService.createTextOutput(e.parameter.callback + '(' + JSON.stringify(errObj) + ')').setMimeType(ContentService.MimeType.JAVASCRIPT);
+    return ContentService.createTextOutput(JSON.stringify(errObj)).setMimeType(ContentService.MimeType.JSON);
   }
 }
 
