@@ -100,7 +100,7 @@
     // ensure a sane default category to avoid rendering nothing
     if(categoriaSel && !categoriaSel.value) categoriaSel.value = 'todas';
 
-    let inventory = JSON.parse(localStorage.getItem('inventory_v1')) || {vidrio:[],aluminio:[],herrajes:[],insumos:[]};
+    let inventory = {vidrio:[],aluminio:[],herrajes:[],insumos:[]};
     // No local server/proxy detection: frontend will post directly to Apps Script
     // migrate legacy 'medida' -> 'medida1'/'medida2' for vidrio items
     if(inventory && inventory.vidrio && Array.isArray(inventory.vidrio)){
@@ -141,6 +141,54 @@
             await fetch(GAS_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }, body });
             console.log('Categories synced to Apps Script', mapping);
         }catch(err){ console.warn('Sync categories to GAS failed', err); }
+    }
+
+    // --- Fetch inventory from Apps Script ---
+    async function loadInventoryForCategory(cat){
+        try{
+            const invId = CATEGORY_TO_INVENTORY[cat];
+            if(!invId) return;
+            const url = GAS_URL + '?action=list&inventory=' + encodeURIComponent(invId);
+            const res = await fetch(url);
+            const txt = await res.text();
+            let j = {};
+            try{ j = txt ? JSON.parse(txt) : {}; }catch(e){ console.warn('Invalid JSON from GAS list', txt); }
+            if(!j || !j.ok || !Array.isArray(j.rows)){
+                console.warn('No rows returned for',cat,j);
+                inventory[cat] = [];
+                return;
+            }
+            // Map sheet rows to frontend item shape
+            const rows = j.rows.map(r => {
+                const item = {};
+                // normalize common fields
+                item.timestamp = r.timestamp || r.Timestamp || '';
+                item.inventoryId = r.inventoryId || r.inventory || '';
+                item.category = r.category || r.Category || cat;
+                item.nombre = r.name || r.nombre || '';
+                item.codigo = r.sku || r.codigo || '';
+                item.cantidad = (r.quantity !== undefined && r.quantity !== null) ? r.quantity : (r.cantidad !== undefined ? r.cantidad : 0);
+                item.notes = r.notes || r.Notes || '';
+                item.imageUrl = r.imageUrl || r.image || '';
+                // ensure id exists (use sku or timestamp)
+                item.id = item.codigo || item.timestamp || makeId();
+                return item;
+            });
+            inventory[cat] = rows;
+        }catch(err){ console.error('loadInventoryForCategory failed',cat,err); inventory[cat]=[]; }
+    }
+
+    // Update quantity on Sheets by sku (uses action=update)
+    async function updateQuantityRemote(cat, item, newQty){
+        try{
+            const invId = CATEGORY_TO_INVENTORY[cat];
+            if(!invId) throw new Error('Inventory id not mapped for '+cat);
+            const payload = { action: 'update', inventory: invId, sku: item.codigo || item.sku || item.codigo, quantity: String(newQty) };
+            const res = await fetch(GAS_URL, { method: 'POST', headers: {'Content-Type':'application/json;charset=UTF-8'}, body: JSON.stringify(payload) });
+            const txt = await res.text();
+            let j={}; try{ j = txt ? JSON.parse(txt) : {}; }catch(e){ console.warn('Invalid JSON from GAS update',txt); }
+            if(j && j.ok) return true; else throw new Error(j && j.error ? j.error : ('HTTP '+res.status));
+        }catch(err){ console.error('updateQuantityRemote failed',err); throw err; }
     }
 
     // helper: all categories list
@@ -316,8 +364,8 @@
                         tr.appendChild(td);
                     });
                     const tdA = document.createElement('td'); tdA.className='actions';
-                    const inBtn = document.createElement('button'); inBtn.innerText='Entrada'; inBtn.addEventListener('click', ()=>{ try{ const q=parseInt(prompt('Cantidad a agregar')||0); if(!q) return; item.cantidad=(parseInt(item.cantidad)||0)+q; saveInventory(); renderTableWithCriteria(criteria); }catch(e){ console.error('Entrada error',e); alert('Error en entrada (ver consola)'); } });
-                    const outBtn = document.createElement('button'); outBtn.innerText='Salida'; outBtn.addEventListener('click', ()=>{ try{ const q=parseInt(prompt('Cantidad a retirar')||0); if(!q) return; if((item.cantidad||0)<q) return alert('Stock insuficiente'); item.cantidad=(parseInt(item.cantidad)||0)-q; saveInventory(); renderTableWithCriteria(criteria); }catch(e){ console.error('Salida error',e); alert('Error en salida (ver consola)'); } });
+                    const inBtn = document.createElement('button'); inBtn.innerText='Entrada'; inBtn.addEventListener('click', async ()=>{ try{ const q=parseInt(prompt('Cantidad a agregar')||0); if(!q) return; const newQty = (parseInt(item.cantidad)||0) + q; await updateQuantityRemote(cat, item, newQty); item.cantidad = newQty; renderTableWithCriteria(criteria); }catch(e){ console.error('Entrada error',e); alert('Error en entrada (ver consola) - '+(e.message||e)); } });
+                    const outBtn = document.createElement('button'); outBtn.innerText='Salida'; outBtn.addEventListener('click', async ()=>{ try{ const q=parseInt(prompt('Cantidad a retirar')||0); if(!q) return; if((item.cantidad||0) < q) return alert('Stock insuficiente'); const newQty = (parseInt(item.cantidad)||0) - q; await updateQuantityRemote(cat, item, newQty); item.cantidad = newQty; renderTableWithCriteria(criteria); }catch(e){ console.error('Salida error',e); alert('Error en salida (ver consola) - '+(e.message||e)); } });
                     const delBtn = document.createElement('button'); delBtn.innerText='Eliminar'; delBtn.addEventListener('click', ()=>{ try{ if(!confirm('Eliminar producto?')) return; inventory[c]=inventory[c].filter(x=>x.id!==item.id); saveInventory(); renderTableWithCriteria(criteria); }catch(e){ console.error('Eliminar error',e); alert('Error al eliminar (ver consola)'); } });
                     tdA.appendChild(inBtn); tdA.appendChild(outBtn); tdA.appendChild(delBtn); tr.appendChild(tdA);
                     tbody.appendChild(tr);
@@ -525,9 +573,9 @@
                         });
                         const tdA = document.createElement('td'); tdA.className='actions';
                         const inBtn = document.createElement('button'); inBtn.innerText='Entrada';
-                        inBtn.addEventListener('click', ()=>{ try{ const q=parseInt(prompt('Cantidad a agregar')||0); if(!q) return; item.cantidad=(parseInt(item.cantidad)||0)+q; saveInventory(); renderTable(cat,filter); }catch(e){ console.error('Entrada error',e); alert('Error en entrada (ver consola)'); } });
+                        inBtn.addEventListener('click', async ()=>{ try{ const q=parseInt(prompt('Cantidad a agregar')||0); if(!q) return; const newQty = (parseInt(item.cantidad)||0) + q; await updateQuantityRemote(c, item, newQty); item.cantidad = newQty; renderTable(c,filter); }catch(e){ console.error('Entrada error',e); alert('Error en entrada (ver consola) - '+(e.message||e)); } });
                         const outBtn = document.createElement('button'); outBtn.innerText='Salida';
-                        outBtn.addEventListener('click', ()=>{ try{ const q=parseInt(prompt('Cantidad a retirar')||0); if(!q) return; if((item.cantidad||0)<q) return alert('Stock insuficiente'); item.cantidad=(parseInt(item.cantidad)||0)-q; saveInventory(); renderTable(cat,filter); }catch(e){ console.error('Salida error',e); alert('Error en salida (ver consola)'); } });
+                        outBtn.addEventListener('click', async ()=>{ try{ const q=parseInt(prompt('Cantidad a retirar')||0); if(!q) return; if((item.cantidad||0) < q) return alert('Stock insuficiente'); const newQty = (parseInt(item.cantidad)||0) - q; await updateQuantityRemote(c, item, newQty); item.cantidad = newQty; renderTable(c,filter); }catch(e){ console.error('Salida error',e); alert('Error en salida (ver consola) - '+(e.message||e)); } });
                         const delBtn = document.createElement('button'); delBtn.innerText='Eliminar';
                         delBtn.addEventListener('click', ()=>{ try{ if(!confirm('Eliminar producto?')) return; inventory[c]=inventory[c].filter(x=>x.id!==item.id); saveInventory(); renderTable(cat,filter); }catch(e){ console.error('Eliminar error',e); alert('Error al eliminar (ver consola)'); } });
                         tdA.appendChild(inBtn); tdA.appendChild(outBtn); tdA.appendChild(delBtn); tr.appendChild(tdA);
@@ -573,7 +621,7 @@
         else console.warn('exportLogCSV button missing');
 
         if(!categoriaSel) console.error('categoriaSel missing');
-        categoriaSel.addEventListener('change', ()=>{ console.log('categoria changed to',categoriaSel.value); formArea.classList.add('hidden'); populateFilterOptions(categoriaSel.value); renderTable(categoriaSel.value, busqueda.value); });
+        categoriaSel.addEventListener('change', async ()=>{ try{ console.log('categoria changed to',categoriaSel.value); formArea.classList.add('hidden'); if(categoriaSel.value === 'todas'){ await Promise.all(allCategories.map(loadInventoryForCategory)); } else { await loadInventoryForCategory(categoriaSel.value); } populateFilterOptions(categoriaSel.value); renderTable(categoriaSel.value, busqueda.value); }catch(e){ console.error('categoria change handler failed',e); } });
         busqueda.addEventListener('input', ()=>{ console.log('busqueda', busqueda.value); renderTable(categoriaSel.value, busqueda.value); });
         filterField.addEventListener('change', ()=>{ console.log('filterField', filterField.value); renderTable(categoriaSel.value, busqueda.value); });
         btnAdvancedSearch.addEventListener('click', ()=>{ openAdvancedSearch(); });
@@ -592,7 +640,15 @@
         populateFilterOptions(categoriaSel.value);
         // attempt to sync categories with Apps Script (best-effort)
         try{ syncCategoriesToGAS(); }catch(e){}
-        renderTable(categoriaSel.value);
+        // load inventory data from Sheets then render
+        try{
+            if(categoriaSel.value === 'todas'){
+                await Promise.all(allCategories.map(loadInventoryForCategory));
+            } else {
+                await loadInventoryForCategory(categoriaSel.value);
+            }
+            renderTable(categoriaSel.value);
+        }catch(err){ console.error('Error loading inventory on init',err); renderTable(categoriaSel.value); }
     }catch(e){
         console.error('Inicialización falló',e);
         // fallback: force 'todas' and render minimal UI
