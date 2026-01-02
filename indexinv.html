@@ -3,302 +3,120 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sistema Profesional de Bodega</title>
-
-<style>
-body{font-family:Arial;background:#f2f2f2;padding:15px}
-h1,h2,h3{margin-top:0}
-.container{background:#fff;padding:15px;border-radius:6px;margin-bottom:15px}
-input,select,button{width:100%;padding:8px;margin:5px 0}
-table{width:100%;border-collapse:collapse;margin-top:10px}
-th,td{border:1px solid #ccc;padding:6px;text-align:center}
-th{background:#eee}
-.hidden{display:none}
-.admin{background:#fff3cd}
-button{cursor:pointer}
-@media(min-width:700px){
-  input,select,button{width:auto}
-}
-</style>
+<title>Acceso Inventario - Aluoferta</title>
+<link rel="stylesheet" href="styles.css">
 </head>
+<body class="centered">
 
-<body>
-
-<h1>📦 Sistema Profesional de Bodega</h1>
-
-<div class="container" id="login">
-<h2>Iniciar sesión</h2>
-<input id="loginUser" placeholder="Usuario">
-<input id="loginPass" type="password" placeholder="Contraseña">
-<button onclick="login()">Entrar</button>
-<p id="loginMsg"></p>
+<div class="container-sm card" id="login">
+    <img src="https://aluoferta.com/wp-content/uploads/2021/03/logo-aluoferta.png" alt="Aluoferta Logo" class="logo" onerror="this.src='img/aluoferta_logo.png'">
+    <h2 class="text-center">Iniciar Sesión</h2>
+    <div class="control-group">
+        <input id="loginUser" placeholder="Usuario">
+        <input id="loginPass" type="password" placeholder="Contraseña">
+    </div>
+    
+    <button onclick="login()" class="btn btn-primary w-100 mt-4">Entrar</button>
+    
+    <p id="loginMsg" class="text-center mt-4" style="color: var(--danger);"></p>
+    
+    <div class="footer">
+        ¿No tienes cuenta? <a onclick="toggleView()" style="cursor: pointer;">Regístrate aquí</a>
+        <br><br>
+        <a href="index.html">Volver al inicio</a>
+    </div>
 </div>
 
-<div class="container" id="registro">
-<h2>Registro</h2>
-<input id="regUser" placeholder="Usuario">
-<input id="regPass" type="password" placeholder="Contraseña">
-<button onclick="registrar()">Solicitar acceso</button>
-<p>⏳ Requiere aprobación del administrador</p>
-</div>
-
-<div class="container hidden" id="panel">
-<h2>Bienvenido <span id="usuarioActivo"></span></h2>
-<button onclick="logout()">Cerrar sesión</button>
-
-<h3>Movimiento de bodega</h3>
-<input id="producto" placeholder="Producto">
-<select id="tipo">
-<option value="entrada">Entrada</option>
-<option value="salida">Salida</option>
-</select>
-<input id="cantidad" type="number" min="1">
-<button onclick="movimiento()">Registrar</button>
-
-<h3>Stock actual</h3>
-<table>
-<thead><tr><th>Producto</th><th>Cantidad</th></tr></thead>
-<tbody id="tablaStock"></tbody>
-</table>
-</div>
-
-<div class="container admin hidden" id="admin">
-<h2>👑 Panel Administrador</h2>
-
-<h3>Usuarios</h3>
-<table>
-<thead><tr><th>Usuario</th><th>Estado</th><th>Acción</th></tr></thead>
-<tbody id="tablaUsuarios"></tbody>
-</table>
-
-<h3>Bitácora</h3>
-<button onclick="exportarCSV()">📊 Exportar a Excel</button>
-<table>
-<thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th></tr></thead>
-<tbody id="tablaLog"></tbody>
-</table>
+<div class="container-sm card hidden" id="registro">
+    <img src="https://aluoferta.com/wp-content/uploads/2021/03/logo-aluoferta.png" alt="Aluoferta Logo" class="logo" onerror="this.src='img/aluoferta_logo.png'">
+    <h2 class="text-center">Solicitar Acceso</h2>
+    <div class="control-group">
+        <input id="regUser" placeholder="Usuario deseado">
+        <input id="regPass" type="password" placeholder="Contraseña">
+    </div>
+    
+    <button onclick="registrar()" class="btn btn-primary w-100 mt-4">Enviar Solicitud</button>
+    
+    <div class="footer">
+        ¿Ya tienes cuenta? <a onclick="toggleView()" style="cursor: pointer;">Inicia sesión</a>
+    </div>
 </div>
 
 <script>
-const ADMIN={user:"admin",pass:"admin123"};
+const GAS_URL = 'https://script.google.com/macros/s/AKfycby9RjQ5V1G2m6M2ORE6lZgkPTYPdQLbCqqxBVJL2lYPrPyeXKG34ANueQGRb1nPka7Z0g/exec';
 
-// Referencias explícitas a elementos del DOM (más fiables que globals)
 const loginDiv = document.getElementById('login');
-const registro = document.getElementById('registro');
-const panel = document.getElementById('panel');
-const admin = document.getElementById('admin');
+const registroDiv = document.getElementById('registro');
 const loginUser = document.getElementById('loginUser');
 const loginPass = document.getElementById('loginPass');
 const loginMsg = document.getElementById('loginMsg');
 const regUser = document.getElementById('regUser');
 const regPass = document.getElementById('regPass');
-const usuarioActivo = document.getElementById('usuarioActivo');
-const producto = document.getElementById('producto');
-const tipo = document.getElementById('tipo');
-const cantidad = document.getElementById('cantidad');
-const tablaStock = document.getElementById('tablaStock');
-const tablaUsuarios = document.getElementById('tablaUsuarios');
-const tablaLog = document.getElementById('tablaLog');
 
-let usuarios=JSON.parse(localStorage.getItem("usuarios"))||{};
-let stock=JSON.parse(localStorage.getItem("stock"))||{};
-let log=JSON.parse(localStorage.getItem("log"))||[];
-let activo=null;
+function hash(txt){ return btoa(unescape(encodeURIComponent(txt))); }
 
-// "Encriptado" simple para demo: Base64 (puedes reemplazar por SHA-256 en servidor)
-function hash(txt){
- return btoa(unescape(encodeURIComponent(txt)));
-}
-
-// Compute SHA-256 hex digest of a string. Uses SubtleCrypto if available, otherwise falls back to a JS implementation.
-async function computeSHA256Hex(msg){
-  if(window.crypto && crypto.subtle && crypto.subtle.digest){
-    const data = new TextEncoder().encode(msg);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2,'0')).join('');
-  }
-  // Fallback: small JS SHA-256 implementation
-  function rightRotate(n,x){ return (x>>>n) | (x<<(32-n)); }
-  const utf8 = unescape(encodeURIComponent(msg));
-  const msgBytes = [];
-  for(let i=0;i<utf8.length;i++) msgBytes.push(utf8.charCodeAt(i));
-  const l = msgBytes.length * 8;
-  msgBytes.push(0x80);
-  while(((msgBytes.length*8) % 512) !== 448) msgBytes.push(0x00);
-  const lenHi = Math.floor(l / 0x100000000);
-  const lenLo = l & 0xffffffff;
-  msgBytes.push((lenHi >>> 24) & 0xff, (lenHi >>> 16) & 0xff, (lenHi >>> 8) & 0xff, lenHi & 0xff);
-  msgBytes.push((lenLo >>> 24) & 0xff, (lenLo >>> 16) & 0xff, (lenLo >>> 8) & 0xff, lenLo & 0xff);
-
-  const K = [0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
-
-  let H = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
-
-  for(let i=0;i<msgBytes.length;i+=64){
-    const chunk = msgBytes.slice(i,i+64);
-    const W = new Array(64);
-    for(let t=0;t<16;t++) W[t] = (chunk[t*4]<<24) | (chunk[t*4+1]<<16) | (chunk[t*4+2]<<8) | (chunk[t*4+3]);
-    for(let t=16;t<64;t++){
-      const s0 = (rightRotate(7,W[t-15]) ^ rightRotate(18,W[t-15]) ^ (W[t-15]>>>3)) >>> 0;
-      const s1 = (rightRotate(17,W[t-2]) ^ rightRotate(19,W[t-2]) ^ (W[t-2]>>>10)) >>> 0;
-      W[t] = (W[t-16] + s0 + W[t-7] + s1) >>> 0;
-    }
-    let a=H[0], b=H[1], c=H[2], d=H[3], e=H[4], f=H[5], g=H[6], h=H[7];
-    for(let t=0;t<64;t++){
-      const S1 = (rightRotate(6,e) ^ rightRotate(11,e) ^ rightRotate(25,e)) >>> 0;
-      const ch = ((e & f) ^ (~e & g)) >>> 0;
-      const temp1 = (h + S1 + ch + K[t] + W[t]) >>> 0;
-      const S0 = (rightRotate(2,a) ^ rightRotate(13,a) ^ rightRotate(22,a)) >>> 0;
-      const maj = ((a & b) ^ (a & c) ^ (b & c)) >>> 0;
-      const temp2 = (S0 + maj) >>> 0;
-      h = g; g = f; f = e; e = (d + temp1) >>> 0; d = c; c = b; b = a; a = (temp1 + temp2) >>> 0;
-    }
-    H[0] = (H[0] + a) >>> 0; H[1] = (H[1] + b) >>> 0; H[2] = (H[2] + c) >>> 0; H[3] = (H[3] + d) >>> 0;
-    H[4] = (H[4] + e) >>> 0; H[5] = (H[5] + f) >>> 0; H[6] = (H[6] + g) >>> 0; H[7] = (H[7] + h) >>> 0;
-  }
-  return H.map(h=> ('00000000'+(h>>>0).toString(16)).slice(-8)).join('');
-}
-
-(function(){
- if(!usuarios.admin){
-   usuarios.admin={pass:hash(ADMIN.pass),autorizado:true};
-   guardar();
- }
-})();
-
-function guardar(){
- localStorage.setItem("usuarios",JSON.stringify(usuarios));
- localStorage.setItem("stock",JSON.stringify(stock));
- localStorage.setItem("log",JSON.stringify(log));
+function toggleView(){
+    loginDiv.classList.toggle('hidden');
+    registroDiv.classList.toggle('hidden');
+    loginMsg.innerText = '';
 }
 
 async function registrar(){
  let u=regUser.value.trim(),p=regPass.value;
- if(!u||!p) return alert("Campos vacíos");
- if(usuarios[u]) return alert("Usuario existe");
- usuarios[u]={pass:hash(p),autorizado:false};
- log.push({fecha:new Date().toLocaleString(),usuario:u,accion:"Solicitó acceso"});
- guardar();
- alert("Solicitud enviada");
-}
-
-// Exportar usuarios a un archivo .txt (usuario,passCodificada,autorizado) por línea
-function exportarUsuarios(){
- let lines=[];
- for(let u in usuarios){
-  lines.push(`${u},${usuarios[u].pass},${usuarios[u].autorizado}`);
+ if(!u||!p) return alert("Por favor complete todos los campos");
+ 
+ try {
+    const hashed = hash(p);
+    const body = new URLSearchParams({ action: 'register', user: u, pass: hashed }).toString();
+    const res = await fetch(GAS_URL, { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body 
+    });
+    const data = await res.json();
+    
+    if(data.error) {
+        alert("Error: " + data.error);
+    } else {
+        alert("Solicitud enviada. Contacte al administrador para aprobación.");
+        toggleView();
+    }
+ } catch(e) {
+    console.error(e);
+    alert("Error de conexión");
  }
- let blob=new Blob([lines.join('\n')],{type:'text/plain;charset=utf-8'});
- let a=document.createElement('a');
- a.href=URL.createObjectURL(blob);
- a.download='usuarios.txt';
- a.click();
-}
-
-// Cargar usuarios desde archivo .txt
-function cargarUsuariosFile(input){
- const f=input.files[0];
- if(!f) return alert('Selecciona un archivo');
- const r=new FileReader();
- r.onload=function(e){
-  const txt=e.target.result.trim();
-  if(!txt) return alert('Archivo vacío');
-  txt.split(/\r?\n/).forEach(line=>{
-   const [u,p,a]=line.split(',');
-   if(u) usuarios[u]={pass:p,autorizado: a==='true'};
-  });
-  guardar();
-  alert('Usuarios cargados');
- };
- r.readAsText(f,'utf-8');
 }
 
 async function login(){
  try{
-  const u=loginUser.value,p=loginPass.value;
-  console.log('Intento login',u);
-  if(!usuarios[u]){ loginMsg.innerText="Usuario no existe"; console.log('Usuario no existe',u); return; }
-  if(!usuarios[u].autorizado){ loginMsg.innerText="No autorizado"; console.log('Usuario no autorizado',u); return; }
-     console.log('Comparando almacenada:',usuarios[u].pass,' con hash(base64):', hash(p),' y con plaintext:', p);
-     const stored = usuarios[u].pass;
-     const hashed = hash(p);
-     // if stored is a SHA-256 hex (legacy), try to compare using SHA-256
-     const isHexSha = /^[0-9a-f]{64}$/i.test(stored);
-     if(isHexSha){
-       const hex = await computeSHA256Hex(p);
-       if(hex===stored){
-         // migrate legacy hex -> base64 encoded (current format)
-         usuarios[u].pass = hashed; guardar(); console.log('Migró SHA-256(hex) a Base64 codificada');
-       } else { loginMsg.innerText="Contraseña incorrecta"; console.log('Pass incorrecta'); return; }
-     } else {
-       if(stored!==hashed && stored!==p){ loginMsg.innerText="Contraseña incorrecta"; console.log('Pass incorrecta'); return; }
-       // If stored was plaintext, migrate to codificada
-       if(stored===p){ usuarios[u].pass=hashed; guardar(); console.log('Migró contraseña a codificada'); }
-     }
-  activo=u;
-  localStorage.setItem('activo',activo);
-  console.log('Login OK, redirigiendo a inventario.html');
-  window.location.href='inventario.html';
+  const u=loginUser.value.trim(),p=loginPass.value;
+  if(!u || !p) { loginMsg.innerText="Complete los campos"; return; }
+  
+  loginMsg.innerText = "Verificando...";
+  
+  const hashed = hash(p);
+  // Use POST to avoid logging credentials in URL parameters
+  const body = new URLSearchParams({ action: 'login', user: u, pass: hashed }).toString();
+  
+  const res = await fetch(GAS_URL, { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body 
+  });
+  const data = await res.json();
+  
+  if(data.error){
+      loginMsg.innerText = data.error;
+  } else if(data.ok){
+      localStorage.setItem('activo', data.user);
+      localStorage.setItem('rol', data.role);
+      window.location.href='inventario.html';
+  }
  }catch(err){
-  console.error('Error en login()',err);
-  loginMsg.innerText='Error en el inicio de sesión';
+  console.error(err);
+  loginMsg.innerText='Error de conexión';
  }
-}
-
-function logout(){location.reload();}
-
-function movimiento(){
- let p=producto.value,c=parseInt(cantidad.value),t=tipo.value;
- if(!p||!c) return alert("Datos incompletos");
- if(!stock[p]) stock[p]=0;
- if(t==="salida"&&stock[p]<c) return alert("Stock insuficiente");
- stock[p]+=t==="entrada"?c:-c;
- log.push({fecha:new Date().toLocaleString(),usuario:activo,accion:`${t} ${c} ${p}`});
- guardar();actualizarStock();actualizarLog();
-}
-
-function actualizarStock(){
- tablaStock.innerHTML="";
- for(let p in stock) tablaStock.innerHTML+=`<tr><td>${p}</td><td>${stock[p]}</td></tr>`;
-}
-
-function actualizarUsuarios(){
- tablaUsuarios.innerHTML="";
- for(let u in usuarios){
-  if(u==="admin") continue;
-  tablaUsuarios.innerHTML+=`
-   <tr>
-    <td>${u}</td>
-    <td>${usuarios[u].autorizado?"Autorizado":"Pendiente"}</td>
-    <td>
-     <button onclick="autorizar('${u}',true)">✔</button>
-     <button onclick="autorizar('${u}',false)">✖</button>
-    </td>
-   </tr>`;
- }
-}
-
-function autorizar(u,v){
- usuarios[u].autorizado=v;
- log.push({fecha:new Date().toLocaleString(),usuario:"admin",accion:`${v?"Autorizó":"Bloqueó"} ${u}`});
- guardar();actualizarUsuarios();actualizarLog();
-}
-
-function actualizarLog(){
- tablaLog.innerHTML="";
- log.forEach(l=>tablaLog.innerHTML+=`<tr><td>${l.fecha}</td><td>${l.usuario}</td><td>${l.accion}</td></tr>`);
-}
-
-function exportarCSV(){
- let csv="Fecha,Usuario,Acción\n";
- log.forEach(l=>csv+=`${l.fecha},${l.usuario},${l.accion}\n`);
- let a=document.createElement("a");
- a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(csv);
- a.download="bitacora_bodega.csv";
- a.click();
 }
 </script>
-
 </body>
 </html>
