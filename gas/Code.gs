@@ -252,6 +252,14 @@ function doPost(e){
       const payloadNormalized = {};
       Object.keys(p).forEach(k => { payloadNormalized[String(k).trim().toLowerCase()] = p[k]; });
 
+      // If notes contained an object, expose its keys at top-level for mapping
+      if(notesObj && typeof notesObj === 'object'){
+        Object.keys(notesObj).forEach(k => {
+          const lk = String(k).trim().toLowerCase();
+          if(!payloadNormalized.hasOwnProperty(lk)) payloadNormalized[lk] = notesObj[k];
+        });
+      }
+
       // Helper to pick value from payloadNormalized, canonical key, or notes object
       function pick(key){
         const k = String(key||'').trim().toLowerCase();
