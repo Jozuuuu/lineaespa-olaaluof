@@ -1547,18 +1547,14 @@
             
             // Configuración optimizada para cilindros y reflejos
             const config = { 
-                fps: 25, // Más FPS para capturar rápido en movimiento
-                qrbox: { width: 260, height: 180 }, // Área de escaneo
+                fps: 20, 
+                qrbox: { width: 260, height: 180 },
                 aspectRatio: 1.0,
                 disableFlip: false
             };
             
-            // Restricciones de cámara con intento de enfoque
-            const constraints = { 
-                facingMode: "environment",
-                focusMode: "continuous",
-                advanced: [{ focusMode: "continuous" }, { zoom: 1.0 }]
-            };
+            // Restricciones de cámara estándar (mayor compatibilidad)
+            const constraints = { facingMode: "environment" };
             
             html5QrcodeScanner.start(constraints, config, onScanSuccess)
             .catch(err => {
