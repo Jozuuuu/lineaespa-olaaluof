@@ -1362,16 +1362,30 @@
                 Html5QrcodeSupportedFormats.ITF
             ];
 
-            html5QrcodeScanner = new Html5Qrcode("reader", { formatsToSupport: formats, verbose: false });
+            // Activar detector nativo si está disponible (mucho más rápido y preciso en móviles)
+            html5QrcodeScanner = new Html5Qrcode("reader", { 
+                formatsToSupport: formats, 
+                verbose: false,
+                experimentalFeatures: {
+                    useBarCodeDetectorIfSupported: true
+                }
+            });
             
             // Ajustar qrbox para que sea más ancho (mejor para códigos de barras)
             const config = { 
-                fps: 10, 
-                qrbox: { width: 280, height: 150 },
+                fps: 25, // Mayor FPS para detección más rápida
+                qrbox: { width: 300, height: 150 },
                 aspectRatio: 1.0
             };
             
-            html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess)
+            // Solicitar alta resolución para mejorar el enfoque en códigos pequeños
+            const constraints = { 
+                facingMode: "environment",
+                width: { min: 640, ideal: 1280, max: 1920 },
+                height: { min: 480, ideal: 720, max: 1080 }
+            };
+            
+            html5QrcodeScanner.start(constraints, config, onScanSuccess)
             .catch(err => {
                 console.error("Error starting scanner", err);
                 alert("No se pudo iniciar la cámara. Asegúrese de dar permisos.");
