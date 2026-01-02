@@ -680,7 +680,7 @@
     }
 
     // --- Form (appears only on Add) ---
-    function renderForm(cat){
+    function renderForm(cat, prefillData = {}){
         console.log('renderForm start',cat);
         cat = cat || (categoriaSel? categoriaSel.value : null);
         if(!cat){ console.error('renderForm: categoría no definida'); return; }
@@ -698,7 +698,7 @@
             if(k==='image'){
                 const inp = document.createElement('input'); inp.type='file'; inp.accept='image/*'; col.appendChild(inp); inputs[k]=inp;
             } else if(k==='cantidad'){
-                const inp = document.createElement('input'); inp.type='number'; inp.min='0'; inp.value='0'; col.appendChild(inp); inputs[k]=inp;
+                const inp = document.createElement('input'); inp.type='number'; inp.min='0'; inp.value=prefillData[k] || '0'; col.appendChild(inp); inputs[k]=inp;
             } else {
                 // create select populated with unique existing values for this field in this category
                 const sel = document.createElement('select'); sel.style.width='100%';
@@ -709,8 +709,17 @@
                 Array.from(vals).sort().forEach(v=>{ const o=document.createElement('option'); o.value=v; o.innerText=v; sel.appendChild(o); });
                 const txt = document.createElement('input'); txt.type='text'; txt.placeholder='Valor personalizado'; txt.style.display='none'; txt.style.marginTop='6px';
                 
-                // Auto-select "Personalizado" if no existing values (UX improvement)
-                if(vals.size === 0){
+                // Handle prefill or auto-select "Personalizado"
+                if(prefillData[k]){
+                    const valStr = prefillData[k].toString();
+                    if(vals.has(valStr)){
+                        sel.value = valStr;
+                    } else {
+                        sel.value = '__OTHER__';
+                        txt.style.display = 'block';
+                        txt.value = valStr;
+                    }
+                } else if(vals.size === 0){
                     sel.value = '__OTHER__';
                     txt.style.display = 'block';
                 }
@@ -1274,6 +1283,18 @@
             return null;
         }
 
+        // Helper for scanner "Add Product" flow
+        window.openAddFormFromScanner = (cat, code) => {
+            // Close scanner modal
+            document.getElementById('cameraScanModal').classList.add('hidden');
+            if(html5QrcodeScanner){
+                try { html5QrcodeScanner.stop(); } catch(e){}
+                html5QrcodeScanner = null;
+            }
+            // Open Add Form
+            renderForm(cat, { codigo: code });
+        };
+
         async function onScanSuccess(decodedText, decodedResult) {
             if(currentScannedItem) return; // Already processing one
             
@@ -1289,6 +1310,8 @@
                 
                 // Show UI
                 scanResult.style.display = 'block';
+                // Ensure actions are visible (might have been hidden by "not found" state)
+                if(scanResult.children[1]) scanResult.children[1].style.display = 'block';
                 
                 // Build detailed info HTML
                 let detailsHtml = `
@@ -1332,28 +1355,47 @@
                 // Play beep
                 try{ new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg').play(); }catch(e){}
             } else {
-                // Optional: Feedback for not found
+                // Not found
                 console.warn('Producto no encontrado localmente:', decodedText);
                 
-                // Mostrar feedback visual temporal en el escáner
-                const feedback = document.createElement('div');
-                feedback.style.position = 'absolute';
-                feedback.style.top = '50%';
-                feedback.style.left = '50%';
-                feedback.style.transform = 'translate(-50%, -50%)';
-                feedback.style.background = 'rgba(0,0,0,0.7)';
-                feedback.style.color = '#fff';
-                feedback.style.padding = '10px 20px';
-                feedback.style.borderRadius = '20px';
-                feedback.style.zIndex = '1000';
-                feedback.innerText = `No encontrado: ${decodedText}`;
+                // Pause scanner
+                if(html5QrcodeScanner) html5QrcodeScanner.pause();
+
+                // Show "Not Found" UI
+                scanResult.style.display = 'block';
+                // Hide standard actions
+                if(scanResult.children[1]) scanResult.children[1].style.display = 'none';
+
+                // Check if we have a valid category selected
+                let cat = categoriaSel.value;
+                let contentHtml = '';
                 
-                const reader = document.getElementById('reader');
-                if(reader) {
-                    reader.style.position = 'relative';
-                    reader.appendChild(feedback);
-                    setTimeout(()=> feedback.remove(), 2000);
+                if(!cat || cat === 'todas' || cat === 'agotados'){
+                    // Need to select category
+                    contentHtml = `
+                        <div style="color: #ef4444; font-weight: bold; font-size: 1.1rem; margin-bottom: 10px;">Producto no registrado</div>
+                        <div style="margin-bottom: 10px;">El código <b>${decodedText}</b> no existe. Para agregarlo, selecciona una categoría:</div>
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            <button class="btn btn-outline" onclick="openAddFormFromScanner('aluminio', '${decodedText}')">Aluminio</button>
+                            <button class="btn btn-outline" onclick="openAddFormFromScanner('vidrio', '${decodedText}')">Vidrio</button>
+                            <button class="btn btn-outline" onclick="openAddFormFromScanner('herrajes', '${decodedText}')">Herrajes</button>
+                            <button class="btn btn-outline" onclick="openAddFormFromScanner('insumos', '${decodedText}')">Insumos</button>
+                        </div>
+                        <button class="btn btn-outline" style="margin-top: 15px; width: 100%;" onclick="resetScannerUI()">Cancelar / Escanear otro</button>
+                    `;
+                } else {
+                    // Category already selected
+                    contentHtml = `
+                        <div style="color: #ef4444; font-weight: bold; font-size: 1.1rem; margin-bottom: 10px;">Producto no registrado</div>
+                        <div style="margin-bottom: 15px;">El código <b>${decodedText}</b> no existe en la categoría <b>${cat.toUpperCase()}</b>.</div>
+                        <button class="btn btn-primary" style="width: 100%; margin-bottom: 10px;" onclick="openAddFormFromScanner('${cat}', '${decodedText}')">
+                            + Agregar a ${cat.toUpperCase()}
+                        </button>
+                        <button class="btn btn-outline" style="width: 100%;" onclick="resetScannerUI()">Cancelar / Escanear otro</button>
+                    `;
                 }
+                
+                scanDetails.innerHTML = contentHtml;
             }
         }
 
