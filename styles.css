@@ -851,3 +851,24 @@ tbody tr:hover td {
     box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.1);
 }
 
+
+/* --- Action Buttons Layout --- */
+.action-buttons {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+    .action-buttons {
+        width: 100%;
+        margin-top: 8px;
+    }
+    .action-buttons .btn-pro {
+        flex: 1;
+        justify-content: center;
+        min-width: 120px;
+    }
+}
+
