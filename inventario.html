@@ -640,15 +640,17 @@
         populateFilterOptions(categoriaSel.value);
         // attempt to sync categories with Apps Script (best-effort)
         try{ syncCategoriesToGAS(); }catch(e){}
-        // load inventory data from Sheets then render
+        // load inventory data from Sheets then render (wrapped in async IIFE)
         try{
-            if(categoriaSel.value === 'todas'){
-                await Promise.all(allCategories.map(loadInventoryForCategory));
-            } else {
-                await loadInventoryForCategory(categoriaSel.value);
-            }
-            renderTable(categoriaSel.value);
-        }catch(err){ console.error('Error loading inventory on init',err); renderTable(categoriaSel.value); }
+            (async ()=>{
+                if(categoriaSel.value === 'todas'){
+                    await Promise.all(allCategories.map(loadInventoryForCategory));
+                } else {
+                    await loadInventoryForCategory(categoriaSel.value);
+                }
+                renderTable(categoriaSel.value);
+            })().catch(err=>{ console.error('Error loading inventory on init',err); renderTable(categoriaSel.value); });
+        }catch(err){ console.error('Inicialización (sync) falló',err); }
     }catch(e){
         console.error('Inicialización falló',e);
         // fallback: force 'todas' and render minimal UI
