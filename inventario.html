@@ -1239,10 +1239,19 @@
         let currentScannedCat = null;
 
         function findProductByCode(code){
-            code = code.trim().toLowerCase();
+            // Robust string normalization
+            const search = String(code).trim().toLowerCase();
+            console.log('Searching for code:', search);
+
             for(const cat of allCategories){
                 const items = inventory[cat] || [];
-                const found = items.find(i => (i.codigo||'').toLowerCase() === code || (i.sku||'').toLowerCase() === code);
+                const found = items.find(i => {
+                    // Safely convert item fields to string before comparison
+                    // This handles cases where 'codigo' is stored as a number in JSON
+                    const itemCode = String(i.codigo || '').trim().toLowerCase();
+                    const itemSku = String(i.sku || '').trim().toLowerCase();
+                    return itemCode === search || itemSku === search;
+                });
                 if(found) return { item: found, cat: cat };
             }
             return null;
