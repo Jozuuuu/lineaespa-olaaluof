@@ -157,6 +157,7 @@
                         <button id="btnScanEntry" class="btn btn-primary" style="background-color: #10b981; border-color: #10b981; flex: 1; padding: 12px;">+ Entrada</button>
                         <button id="btnScanExit" class="btn btn-primary" style="background-color: #ef4444; border-color: #ef4444; flex: 1; padding: 12px;">- Salida</button>
                     </div>
+                    <button id="btnScanClear" class="btn btn-outline" style="width:100%; margin-top:10px; border-color:#9ca3af; color:#4b5563;">Cancelar / Escanear Siguiente</button>
                 </div>
             </div>
 
@@ -1241,6 +1242,7 @@
         const scanResult = document.getElementById('scanResult');
         const btnScanEntry = document.getElementById('btnScanEntry');
         const btnScanExit = document.getElementById('btnScanExit');
+        const btnScanClear = document.getElementById('btnScanClear');
         const scanDetails = document.getElementById('scanDetails');
         let html5QrcodeScanner = null;
         let currentScannedItem = null;
@@ -1386,6 +1388,7 @@
 
         btnScanEntry.addEventListener('click', ()=> handleScanAction(true));
         btnScanExit.addEventListener('click', ()=> handleScanAction(false));
+        if(btnScanClear) btnScanClear.addEventListener('click', resetScannerUI);
 
         function resetScannerUI(){
             scanResult.style.display = 'none';
@@ -1393,7 +1396,12 @@
             currentScannedCat = null;
             scanQty.value = 1;
             if(html5QrcodeScanner) {
-                try{ html5QrcodeScanner.resume(); }catch(e){ console.warn('Resume failed',e); }
+                try{ 
+                    // Resume scanning if paused
+                    if(html5QrcodeScanner.getState() === 3){ // PAUSED
+                        html5QrcodeScanner.resume(); 
+                    }
+                }catch(e){ console.warn('Resume failed',e); }
             }
         }
 
