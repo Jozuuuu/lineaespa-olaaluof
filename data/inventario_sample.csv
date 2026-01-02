@@ -1,0 +1,6 @@
+categoria,id,imageName,cantidad,campos
+vidrio,vid1,,10,"tipo:templado|color:transparente|grosor:6mm|forma:rectangular|medida:100x200"
+aluminio,al1,,5,"linea:LX|serie:100|nombre:PerfilA|color:blanco|codigo:PA100"
+herrajes,hr1,,20,"nombre:Bisagra1|color:plateado|codigo:BZ1"
+insumos,in1,,50,"nombre:Silicona|tipo:adhesivo|color:transparente|codigo:SIL1"
+# Formato: categoria,id,imageName,cantidad,campos (campos contiene k:v separados por |)

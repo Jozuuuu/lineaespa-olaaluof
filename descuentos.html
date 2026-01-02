@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hoja de Corte – Línea Española</title>
+
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- REEMPLAZA el agrupamiento original de tarjetas por este contenedor grid -->
+<div class="container">
+  <div class="header-bar">
+    <img src="img/aluoferta_logo.png" alt="Aluoferta" class="logo">
+    <a href="index.html" class="btn btn-outline" style="white-space:nowrap">Volver al inicio</a>
+  </div>
+  <h1>Hoja de Corte — Sistemas Españoles</h1>
+
+  <div class="grid">
+    <!-- sección izquierda: formulario (mantener mismo contenido dentro) -->
+    <div class="card">
+      <h2>Datos generales</h2>
+
+      <div class="control-group">
+        <label>Línea</label>
+        <select id="linea" onchange="configurarLinea()">
+        <option value="">-- Selecciona --</option>
+        <option value="1400">1400</option>
+        <option value="3500">3500</option>
+        <option value="4600">4600</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label>Tipo / Configuración</label>
+        <select id="tipo"></select>
+      </div>
+
+      <div class="control-group">
+        <label>Ancho B (mm)</label>
+        <input type="number" id="B" placeholder="Ej. 1800">
+      </div>
+
+      <div class="control-group">
+        <label>Alto A (mm)</label>
+        <input type="number" id="A" placeholder="Ej. 2100">
+      </div>
+
+      <button class="btn btn-primary mt-4" onclick="calcular()">Calcular cortes</button>
+    </div>
+
+    <!-- sección derecha: resultados -->
+    <div class="card result-layout">
+      <h2>Resultados de corte</h2>
+      <div id="resultado">—</div>
+      <div class="hint">Vista previa de hoja + miniaturas optimizadas para impresión y revisión.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+function configurarLinea(){
+let linea=document.getElementById("linea").value;
+let tipo=document.getElementById("tipo");
+tipo.innerHTML='<option value="">-- Selecciona --</option>';
+
+if(linea==="1400"){
+tipo.innerHTML+=`
+<option value="1400_proj_ventana">Proyección 1 hoja – Ventana</option>
+<option value="1400_proj_puerta">Proyección 1 hoja – Puerta</option>
+<option value="1400_ventana_2h">Ventana 2 hojas apertura interior</option>
+<option value="1400_puerta_1h">Puerta 1 hoja</option>
+<option value="1400_puerta_2h">Puerta 2 hojas</option>`;
+}
+
+if(linea==="3500"){
+tipo.innerHTML+=`
+<option value="3500_2h">Corrediza 2 hojas</option>
+<option value="3500_3h">Corrediza 3 hojas</option>
+<option value="3500_4h">Corrediza 4 hojas</option>`;
+}
+
+if(linea==="4600"){
+tipo.innerHTML+=`
+<option value="4600_r2">Recta – 2 hojas</option>
+<option value="4600_r3">Recta – 3 hojas</option>
+<option value="4600_r4">Recta – 4 hojas</option>
+<option value="4600_r6">Recta – 6 hojas</option>
+<option value="4600_m2">Monumental – 2 hojas</option>
+<option value="4600_m3">Monumental – 3 hojas</option>
+<option value="4600_m4">Monumental – 4 hojas</option>
+<option value="4600_m6">Monumental – 6 hojas</option>`;
+}
+}
+
+function fila(n,c,m,co){
+  const img=getImageForPerfil(n);
+  return `<tr>
+    <td>${n}</td>
+    <td><img class="perfil-img" src="${img}" alt="${n}"></td>
+    <td>${c}</td>
+    <td>${m} mm</td>
+    <td>${co}</td>
+  </tr>`;
+}
+
+/* NUEVO: guarda la configuración seleccionada para decidir imágenes por línea */
+let currentTipoSeleccionado = "";
+
+/* Reemplazamos la función getImageForPerfil para devolver imágenes por línea (1400/3500/4600),
+   y diferenciar puerta / ventana / monumental / corrediza / perimetral. */
+function getImageForPerfil(perfil){
+  const p = perfil.toLowerCase();
+  // determina línea desde la selección actual
+  let lineKey = "common";
+  if(currentTipoSeleccionado && currentTipoSeleccionado.startsWith("1400")) lineKey = "1400";
+  else if(currentTipoSeleccionado && currentTipoSeleccionado.startsWith("3500")) lineKey = "3500";
+  else if(currentTipoSeleccionado && currentTipoSeleccionado.startsWith("4600")) lineKey = "4600";
+
+  // prioridad: entradas específicas
+  if(p.includes("junquillo")) return `img/perfiles/${lineKey}/junquillo.png`;
+  if(p.includes("zócalo") || p.includes("zocalo")) return `img/perfiles/${lineKey}/zocalo.png`;
+  if(p.includes("pilastra")) return `img/perfiles/${lineKey}/pilastra.png`;
+  if(p.includes("ruedas")) return `img/perfiles/${lineKey}/hoja_ruedas.png`;
+  if(p.includes("unión") || p.includes("union cuatro hojas")) return `img/perfiles/${lineKey}/union_cuatro.png`;
+
+  // --- 3500: distinguir cerco superior / inferior / lateral y marco H/V ---
+  if(lineKey === "3500"){
+    if(p.includes("cerco inferior")) return `img/perfiles/3500/cerco_inferior.png`;
+    if(p.includes("cerco superior")) return `img/perfiles/3500/cerco_superior.png`;
+    if(p.includes("cerco lateral")) return `img/perfiles/3500/cerco_lateral.png`;
+    if(p.includes("marco") || p.includes("cerco")){
+      if(p.includes("horizontal")) return `img/perfiles/3500/marco_horizontal.png`;
+      if(p.includes("vertical")) return `img/perfiles/3500/marco_vertical.png`;
+      return `img/perfiles/3500/cerco.png`;
+    }
+    if(p.includes("hoja central")) return `img/perfiles/3500/hoja_central.png`;
+    if(p.includes("hoja lateral")) return `img/perfiles/3500/hoja_lateral.png`;
+  }
+
+  // --- 4600: separar HOJA PERIMETRAL (normal) de HOJA MONUMENTAL ---
+  if(lineKey==="4600"){
+    // TAPA monumental primero (si aplica)
+    if(p.includes("tapa") && p.includes("monumental")) {
+      return `img/perfiles/4600/monumental/tapa_central_monumental.png`;
+    }
+
+    // hoja perimetral (aplica a tipos "Hoja perimetral ...")
+    if(p.includes("hoja perimetral") || (p.includes("hoja") && p.includes("perimetral"))){
+      return `img/perfiles/4600/hoja_perimetral.png`;
+    }
+    // hoja monumental (aplica a tipos que contienen "monumental" o "hoja monumental")
+    if(p.includes("hoja monumental") || p.includes("monumental")){
+      return `img/perfiles/4600/monumental/hoja_monumental.png`;
+    }
+
+    // rieles / vías y marco perimetral por número de vías (2/3)
+    const is2vias = /\b2\s*v[ií]as?\b/.test(p);
+    const is3vias = /\b3\s*v[ií]as?\b/.test(p);
+    if(p.includes("marco") || p.includes("perimetral")){
+      if(is2vias) return `img/perfiles/4600/marco_perimetral_2.png`;
+      if(is3vias) return `img/perfiles/4600/marco_perimetral_3.png`;
+      return `img/perfiles/4600/marco_perimetral.png`;
+    }
+
+    // tapa normal
+    if(p.includes("tapa")) return `img/perfiles/4600/tapa_central.png`;
+    if(p.includes("hoja perimetral")) return `img/perfiles/4600/hoja_perimetral.png`;
+    if(p.includes("hoja")) return `img/perfiles/4600/hoja_perimetral.png`; // default para 'hoja' en 4600
+  }
+
+  // ventana vs puerta (por línea)
+  if(p.includes("ventana")) {
+    return `img/perfiles/${lineKey}/ventana/` + (p.includes("marco") ? "marco_ventana.png" : "hoja_ventana.png");
+  }
+  if(p.includes("puerta")) {
+    return `img/perfiles/${lineKey}/puerta/` + (p.includes("marco") ? "marco_puerta.png" : "hoja_puerta.png");
+  }
+
+  // genéricos / fallback por nombre (respetar superior/inferior/lateral si se menciona)
+  if(p.includes("cerco inferior")) return `img/perfiles/${lineKey}/cerco_inferior.png`;
+  if(p.includes("cerco superior")) return `img/perfiles/${lineKey}/cerco_superior.png`;
+  if(p.includes("cerco lateral")) return `img/perfiles/${lineKey}/cerco_lateral.png`;
+  if(p.includes("hoja central")) return `img/perfiles/${lineKey}/hoja_central.png`;
+  if(p.includes("hoja lateral")) return `img/perfiles/${lineKey}/hoja_lateral.png`;
+  if(p.includes("tapa")) return `img/perfiles/${lineKey}/tapa_central.png`;
+  if(p.includes("marco")) {
+    if(p.includes("horizontal")) return `img/perfiles/${lineKey}/marco_horizontal.png`;
+    if(p.includes("vertical")) return `img/perfiles/${lineKey}/marco_vertical.png`;
+    return `img/perfiles/${lineKey}/marco_vertical.png`;
+  }
+
+  // último recurso
+  return `img/perfiles/${lineKey}/default.png`;
+}
+
+/* Mapa de imágenes por combinación (tipo) */
+const hojaMap = {
+  "1400_proj_ventana": {img:"img/perfiles/hoja_1400_proj_ventana.png", title:"Hoja — 1400 Proyección ventana"},
+  "1400_proj_puerta":  {img:"img/perfiles/hoja_1400_proj_puerta.png",  title:"Hoja — 1400 Proyección puerta"},
+  "1400_ventana_2h":   {img:"img/perfiles/hoja_1400_ventana_2h.png",   title:"Hoja — 1400 Ventana 2 hojas"},
+  "1400_puerta_1h":    {img:"img/perfiles/hoja_1400_puerta_1h.png",    title:"Hoja — 1400 Puerta 1 hoja"},
+  "1400_puerta_2h":    {img:"img/perfiles/hoja_1400_puerta_2h.png",    title:"Hoja — 1400 Puerta 2 hojas"},
+
+  "3500_2h": {img:"img/perfiles/hoja_3500_2h.png", title:"Hoja — 3500 Corrediza 2 hojas"},
+  "3500_3h": {img:"img/perfiles/hoja_3500_3h.png", title:"Hoja — 3500 Corrediza 3 hojas"},
+  "3500_4h": {img:"img/perfiles/hoja_3500_4h.png", title:"Hoja — 3500 Corrediza 4 hojas"},
+
+  "4600_r2": {img:"img/perfiles/hoja_4600_r2.png", title:"Hoja — 4600 Recta 2 hojas"},
+  "4600_r3": {img:"img/perfiles/hoja_4600_r3.png", title:"Hoja — 4600 Recta 3 hojas"},
+  "4600_r4": {img:"img/perfiles/hoja_4600_r4.png", title:"Hoja — 4600 Recta 4 hojas"},
+  "4600_r6": {img:"img/perfiles/hoja_4600_r6.png", title:"Hoja — 4600 Recta 6 hojas"},
+  "4600_m2": {img:"img/perfiles/hoja_4600_m2.png", title:"Hoja — 4600 Monumental 2 hojas"},
+  "4600_m3": {img:"img/perfiles/hoja_4600_m3.png", title:"Hoja — 4600 Monumental 3 hojas"},
+  "4600_m4": {img:"img/perfiles/hoja_4600_m4.png", title:"Hoja — 4600 Monumental 4 hojas"},
+  "4600_m6": {img:"img/perfiles/hoja_4600_m6.png", title:"Hoja — 4600 Monumental 6 hojas"}
+};
+
+function getHojaImage(tipo){
+  return (hojaMap[tipo] && hojaMap[tipo].img) ? hojaMap[tipo].img : "img/perfiles/default_hoja.png";
+}
+function getHojaTitle(tipo){
+  return (hojaMap[tipo] && hojaMap[tipo].title) ? hojaMap[tipo].title : "Hoja";
+}
+
+/* Reemplaza la función calcular para asignar currentTipoSeleccionado antes de crear filas */
+function calcular(){
+let tipo=document.getElementById("tipo").value;
+let A=parseFloat(document.getElementById("A").value);
+let B=parseFloat(document.getElementById("B").value);
+
+if(!tipo||isNaN(A)||isNaN(B)){
+document.getElementById("resultado").innerHTML=
+'<div class="alert">Completa todos los datos</div>';
+return;
+}
+
+/* NUEVO: set global para que getImageForPerfil use la línea/configuración actual */
+currentTipoSeleccionado = tipo;
+
+/* preview de la hoja seleccionada */
+const hojaImg = getHojaImage(tipo);
+const hojaTitle = getHojaTitle(tipo);
+const preview = `<div class="hoja-preview-wrap">
+  <div><strong>Hoja seleccionada:</strong></div>
+  <img class="hoja-preview-img" src="${hojaImg}" alt="${hojaTitle}">
+  <div>${hojaTitle}</div>
+</div>`;
+
+let h=`<div class="table-responsive"><table>
+<tr><th>Perfil</th><th>Imagen</th><th>Cant.</th><th>Medida</th><th>Corte</th></tr>`;
+/* =======================
+   LÍNEA 1400
+======================= */
+/* (SIN CAMBIOS) */
+
+if(tipo==="1400_proj_ventana"){
+h+=fila("Marco liso ventana vertical",2,A,"45° / 45°");
+h+=fila("Marco liso ventana horizontal",2,B,"45° / 45°");
+h+=fila("Hoja lisa ventana vertical",2,A-42,"45° / 45°");
+h+=fila("Hoja lisa ventana horizontal",2,B-42,"45° / 45°");
+// Junquillo (debe medirse)
+h+=`<tr>
+  <td>Junquillo</td>
+  <td><img class="perfil-img" src="${getImageForPerfil('Junquillo')}" alt="Junquillo"></td>
+  <td>4</td>
+  <td><strong>Debe medirse</strong></td>
+  <td>—</td>
+</tr>`;
+}
+
+if(tipo==="1400_proj_puerta"){
+h+=fila("Marco liso puerta vertical",2,A,"45° / 45°");
+h+=fila("Marco liso puerta horizontal",2,B,"45° / 45°");
+h+=fila("Hoja lisa puerta vertical",2,A-73,"45° / 45°");
+h+=fila("Hoja lisa puerta horizontal",2,B-73,"45° / 45°");
+// Junquillo (debe medirse)
+h+=`<tr>
+  <td>Junquillo</td>
+  <td><img class="perfil-img" src="${getImageForPerfil('Junquillo')}" alt="Junquillo"></td>
+  <td>4</td>
+  <td><strong>Debe medirse</strong></td>
+  <td>—</td>
+</tr>`;
+}
+
+if(tipo==="1400_ventana_2h"){
+h+=fila("Marco liso ventana vertical",2,A,"45° / 45°");
+h+=fila("Marco liso ventana horizontal",2,B,"45° / 45°");
+h+=fila("Hoja lisa ventana vertical",4,A-42,"45° / 45°");
+h+=fila("Hoja lisa ventana horizontal",4,(B-56)/2,"45° / 45°");
+h+=fila("Pilastra lisa ventana (T)",1,A-93,"Recto");
+// Junquillo (debe medirse)
+h+=`<tr>
+  <td>Junquillo</td>
+  <td><img class="perfil-img" src="${getImageForPerfil('Junquillo')}" alt="Junquillo"></td>
+  <td>4</td>
+  <td><strong>Debe medirse</strong></td>
+  <td>—</td>
+</tr>`;
+}
+
+if(tipo==="1400_puerta_1h"){
+h+=fila("Marco liso puerta vertical",2,A,"90° / 45°");
+h+=fila("Marco liso puerta horizontal",1,B,"45°");
+h+=fila("Hoja lisa puerta vertical",2,A-43,"45° / 90°");
+h+=fila("Hoja lisa puerta horizontal",1,B-73,"45°");
+h+=fila("Zócalo inferior",1,B-180,"90°");
+// Junquillo (debe medirse)
+h+=`<tr>
+  <td>Junquillo</td>
+  <td><img class="perfil-img" src="${getImageForPerfil('Junquillo')}" alt="Junquillo"></td>
+  <td>4</td>
+  <td><strong>Debe medirse</strong></td>
+  <td>—</td>
+</tr>`;
+}
+
+if(tipo==="1400_puerta_2h"){
+h+=fila("Marco liso puerta vertical",2,A,"90° / 45°");
+h+=fila("Marco liso puerta horizontal",1,B,"45°");
+h+=fila("Hoja lisa puerta vertical",4,A-43,"45° / 90°");
+h+=fila("Hoja lisa puerta horizontal",2,(B-90)/2,"45°");
+h+=fila("Pilastra lisa ventana",1,A-65,"Recto");
+h+=fila("Zócalo inferior",2,(B-300)/2,"90°");
+// Junquillo (debe medirse) — ya existente, mantenido consistente
+h+=`<tr>
+  <td>Junquillo</td>
+  <td><img class="perfil-img" src="${getImageForPerfil('Junquillo')}" alt="Junquillo"></td>
+  <td>4</td>
+  <td><strong>Debe medirse</strong></td>
+  <td>—</td>
+</tr>`;
+}
+
+/* =======================
+   LÍNEA 3500
+======================= */
+/* (SIN CAMBIOS) */
+
+if(tipo==="3500_2h"){
+h+=fila("Cerco inferior",1,B-41,"90°");
+h+=fila("Cerco superior",1,B-41,"90°");
+h+=fila("Cerco lateral",2,A,"90°");
+h+=fila("Hoja central (traslape)",2,A-53,"90°");
+h+=fila("Hoja lateral",2,A-53,"90°");
+h+=fila("Hoja de ruedas",4,(B-33)/2,"90°");
+}
+
+if(tipo==="3500_3h"){
+h+=fila("Cerco inferior",1,B-41,"90°");
+h+=fila("Cerco superior",1,B-41,"90°");
+h+=fila("Cerco lateral",2,A,"90°");
+h+=fila("Hoja central (traslape)",4,A-53,"90°");
+h+=fila("Hoja lateral",2,A-53,"90°");
+h+=fila("Hoja de ruedas",6,(B+12)/3,"90°");
+}
+
+if(tipo==="3500_4h"){
+h+=fila("Cerco inferior",1,B-41,"90°");
+h+=fila("Cerco superior",1,B-41,"90°");
+h+=fila("Cerco lateral",2,A,"90°");
+h+=fila("Hoja central (traslape)",4,A-53,"90°");
+h+=fila("Hoja lateral",4,A-53,"90°");
+h+=fila("Hoja de ruedas",8,(B-19)/4,"90°");
+h+=fila("Unión cuatro hojas",1,A-73,"90°");
+}
+
+/* =======================
+   LÍNEA 4600
+======================= */
+
+if(tipo==="4600_r2"){
+h+=fila("Marco perimetral 2 vías vertical",2,A,"45°");
+h+=fila("Marco perimetral 2 vías horizontal",2,B,"45°");
+h+=fila("Hoja perimetral vertical",4,A-70,"45°");
+h+=fila("Hoja perimetral horizontal",4,(B-9)/2,"45°");
+h+=fila("Tapa hoja central",2,A-73,"90°");
+}
+
+if(tipo==="4600_r3"){
+h+=fila("Marco perimetral 3 vías vertical",2,A,"45°");
+h+=fila("Marco perimetral 3 vías horizontal",2,B,"45°");
+h+=fila("Hoja perimetral vertical",6,A-70,"45°");
+h+=fila("Hoja perimetral horizontal",6,(B+52)/3,"45°");
+h+=fila("Tapa hoja central",4,A-73,"90°");
+}
+
+if(tipo==="4600_r4"){
+h+=fila("Marco perimetral 2 vías vertical",2,A,"45°");
+h+=fila("Marco perimetral 2 vías horizontal",2,B,"45°");
+h+=fila("Hoja perimetral vertical",8,A-70,"45°");
+h+=fila("Hoja perimetral horizontal",8,(B+51)/4,"45°");
+h+=fila("Tapa hoja central",4,A-73,"90°");
+h+=fila("Unión cuatro hojas",1,A-90,"90°");
+}
+
+if(tipo==="4600_r6"){
+h+=fila("Marco perimetral 3 vías vertical",2,A,"45°");
+h+=fila("Marco perimetral 3 vías horizontal",2,B,"45°");
+h+=fila("Hoja perimetral vertical",12,A-70,"45°");
+h+=fila("Hoja perimetral horizontal",12,(B+178)/6,"45°");
+h+=fila("Tapa hoja central",8,A-73,"90°");
+h+=fila("Unión cuatro hojas",1,A-90,"90°");
+}
+
+if(tipo==="4600_m2"){
+h+=fila("Marco perimetral 2 vías vertical",2,A,"45°");
+h+=fila("Marco perimetral 2 vías horizontal",2,B,"45°");
+h+=fila("Hoja monumental vertical",4,A-70,"45°");
+h+=fila("Hoja monumental horizontal",4,B/2,"45°");
+h+=fila("Tapa hoja central monumental",2,A-73,"90°");
+}
+
+if(tipo==="4600_m3"){
+h+=fila("Marco perimetral 3 vías vertical",2,A,"45°");
+h+=fila("Marco perimetral 3 vías horizontal",2,B,"45°");
+h+=fila("Hoja monumental vertical",6,A-70,"45°");
+h+=fila("Hoja monumental horizontal",6,(B+71)/3,"45°");
+h+=fila("Tapa hoja central monumental",4,A-73,"90°");
+}
+
+if(tipo==="4600_m4"){
+h+=fila("Marco perimetral 2 vías vertical",2,A,"45°");
+h+=fila("Marco perimetral 2 vías horizontal",2,B,"45°");
+h+=fila("Hoja monumental vertical",8,A-70,"45°");
+h+=fila("Hoja monumental horizontal",8,(B+66)/4,"45°");
+h+=fila("Tapa hoja central monumental",4,A-73,"90°");
+h+=fila("Unión cuatro hojas",1,A-90,"90°");
+}
+
+if(tipo==="4600_m6"){
+h+=fila("Marco perimetral 3 vías vertical",2,A,"45°");
+h+=fila("Marco perimetral 3 vías horizontal",2,B,"45°");
+h+=fila("Hoja monumental vertical",12,A-70,"45°");
+h+=fila("Hoja monumental horizontal",12,(B+205)/6,"45°");
+h+=fila("Tapa hoja central monumental",8,A-73,"90°");
+h+=fila("Unión cuatro hojas",1,A-90,"90°");
+}
+
+h+="</table></div>";
+document.getElementById("resultado").innerHTML = preview + h;
+}
+</script>
+
+</body>
+</html>
