@@ -1448,7 +1448,6 @@
                     html5QrcodeScanner.stop().then(()=>{ 
                         html5QrcodeScanner.clear(); 
                         html5QrcodeScanner=null; 
-                        // Pequeño delay para asegurar que la cámara se liberó
                         setTimeout(startScanner, 200); 
                     }).catch(err=>{
                         console.warn('Stop failed', err);
@@ -1462,7 +1461,6 @@
                 return;
             }
             
-            // Use html5-qrcode library
             const formats = [
                 Html5QrcodeSupportedFormats.QR_CODE,
                 Html5QrcodeSupportedFormats.EAN_13,
@@ -1474,68 +1472,80 @@
                 Html5QrcodeSupportedFormats.CODABAR
             ];
 
-            // Configuración estándar
             html5QrcodeScanner = new Html5Qrcode("reader", { 
                 formatsToSupport: formats, 
                 verbose: false
             });
             
-            // Caja de escaneo más ancha para códigos de barras
             const config = { 
                 fps: 15, 
-                qrbox: { width: 300, height: 150 }, 
+                qrbox: { width: 280, height: 150 }, 
                 aspectRatio: 1.0
             };
             
-            // Intentar solicitar resolución HD y enfoque continuo
-            const constraints = { 
+            // Estrategia de inicio escalonada:
+            // 1. Intentar HD + Enfoque Continuo (Mejor calidad)
+            // 2. Si falla, intentar solo Environment (Estándar)
+            // 3. Si falla, intentar User (Frontal)
+            
+            const constraintsHD = { 
                 facingMode: "environment",
                 width: { min: 640, ideal: 1280, max: 1920 },
                 height: { min: 480, ideal: 720, max: 1080 },
                 advanced: [{ focusMode: "continuous" }]
             };
-            
-            html5QrcodeScanner.start(constraints, config, onScanSuccess)
-            .then(() => {
-                // Configurar Zoom si está disponible
+
+            const constraintsBasic = { facingMode: "environment" };
+            const constraintsUser = { facingMode: "user" };
+
+            // Función auxiliar para configurar UI de Zoom
+            const setupZoom = () => {
                 const zoomControls = document.getElementById('zoomControls');
                 const zoomSlider = document.getElementById('zoomSlider');
                 const zoomValue = document.getElementById('zoomValue');
-                
-                // Intentar obtener capacidades de la cámara
-                try {
-                    // Nota: html5-qrcode no expone getCapabilities directamente en todas las versiones,
-                    // pero podemos intentar acceder al track de video si es posible.
-                    // Implementación genérica de zoom UI:
-                    const videoTrack = html5QrcodeScanner.html5QrcodeScannerState 
-                        ? null // Internal state not easily accessible
-                        : null; 
-                    
-                    // Usamos applyVideoConstraints para probar si el zoom funciona
-                    // Habilitamos el control de zoom por defecto si la cámara arrancó
+                if(zoomControls){
                     zoomControls.style.display = 'flex';
-                    
+                    zoomSlider.value = 1;
+                    zoomValue.innerText = '1.0x';
                     zoomSlider.oninput = () => {
                         const val = parseFloat(zoomSlider.value);
                         zoomValue.innerText = val + 'x';
-                        html5QrcodeScanner.applyVideoConstraints({
-                            advanced: [{ zoom: val }]
-                        }).catch(e => console.warn('Zoom not supported', e));
+                        try{
+                            html5QrcodeScanner.applyVideoConstraints({ advanced: [{ zoom: val }] })
+                            .catch(e => console.warn('Zoom apply failed', e));
+                        }catch(e){}
                     };
-                } catch(e) {
-                    console.warn('Zoom setup failed', e);
-                    zoomControls.style.display = 'none';
                 }
+            };
+
+            // Intento 1: HD
+            html5QrcodeScanner.start(constraintsHD, config, onScanSuccess)
+            .then(() => {
+                console.log("Scanner started in HD mode");
+                setupZoom();
             })
             .catch(err => {
-                console.error("Error starting scanner with HD constraints", err);
-                // Fallback 1: Intentar sin restricciones avanzadas
-                html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess)
+                console.warn("HD start failed, retrying basic...", err);
+                // Intento 2: Básico
+                html5QrcodeScanner.start(constraintsBasic, config, onScanSuccess)
+                .then(() => {
+                    console.log("Scanner started in Basic mode");
+                    setupZoom();
+                })
                 .catch(err2 => {
-                     console.error("Error starting scanner with basic constraints", err2);
-                     alert("No se pudo iniciar la cámara trasera. Intentando frontal...");
-                     // Fallback 2: Cámara frontal
-                     html5QrcodeScanner.start({ facingMode: "user" }, config, onScanSuccess);
+                     console.warn("Basic start failed, retrying user...", err2);
+                     // Intento 3: Frontal
+                     html5QrcodeScanner.start(constraintsUser, config, onScanSuccess)
+                     .then(() => {
+                         console.log("Scanner started in User mode");
+                         // Zoom suele no estar disponible en frontal, pero lo intentamos
+                         setupZoom();
+                     })
+                     .catch(err3 => {
+                         console.error("All scanner attempts failed", err3);
+                         alert("No se pudo iniciar ninguna cámara. Verifique permisos.");
+                         stopScanner();
+                     });
                 });
             });
         }
