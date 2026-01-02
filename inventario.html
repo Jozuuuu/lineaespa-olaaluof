@@ -101,37 +101,7 @@
     if(categoriaSel && !categoriaSel.value) categoriaSel.value = 'todas';
 
     let inventory = JSON.parse(localStorage.getItem('inventory_v1')) || {vidrio:[],aluminio:[],herrajes:[],insumos:[]};
-    // server sync flag
-    let serverAvailable = false;
-    let socket = null;
-    // local server base (adjust if your server runs on a different host/port)
-    const SERVER_BASE = 'http://localhost:3000';
-
-    // try to detect server
-    (async function detectServer(){
-        // Try local server first, then same-origin fallback
-        const tryUrls = [SERVER_BASE + '/api/ping', '/api/ping'];
-        for(const url of tryUrls){
-                        try{
-                const res = await fetch(url);
-                if(res.ok){
-                    serverAvailable = true; console.log('Server detected at', url);
-                    // fetch server inventory and use it
-                    try{
-                        const invRes = await fetch(url.replace('/api/ping','/api/inventory'));
-                        if(invRes.ok){
-                            const txt = await invRes.text();
-                            try{ if(txt) inventory = JSON.parse(txt); localStorage.setItem('inventory_v1', JSON.stringify(inventory)); }catch(e){ console.warn('Failed parsing inventory JSON', e, txt); }
-                        }
-                    }catch(e){ console.warn('Failed fetching inventory from', url, e); }
-                    // connect socket (only works if same origin or socket server accessible)
-                    try{ socket = io(); socket.on('inventory-updated', data=>{ inventory = data; localStorage.setItem('inventory_v1', JSON.stringify(inventory)); renderTable(categoriaSel.value, busqueda.value); }); }catch(e){ console.warn('socket connect failed',e); }
-                    break;
-                }
-            }catch(e){ /* ignore and try next */ }
-        }
-        if(!serverAvailable) console.log('No server detected, working offline');
-    })();
+    // No local server/proxy detection: frontend will post directly to Apps Script
     // migrate legacy 'medida' -> 'medida1'/'medida2' for vidrio items
     if(inventory && inventory.vidrio && Array.isArray(inventory.vidrio)){
         inventory.vidrio.forEach(it=>{
@@ -142,8 +112,8 @@
             }
         });
     }
-    // Use Vercel proxy to avoid CORS (deployed proxy forwards to Apps Script)
-    const GAS_URL = 'https://lineaespa-olaaluof-clx8mbvc7-jozuuuus-projects.vercel.app/api/proxy';
+    // Apps Script Web App exec URL (direct). Replace with your deployment URL if different.
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbwXI2drMP3mxNDqwv99ielfqvXc4YF5oSw9tJfoQSoF7AgEONm3JbGfIu67FbGTIfAdPQ/exec';
     // Mapear categoría UI -> id de inventario en Apps Script (ajusta según tu configuración)
     const CATEGORY_TO_INVENTORY = { aluminio: '1', herrajes: '2', vidrio: '3', insumos: '4' };
 
@@ -166,12 +136,9 @@
                 mapping[inv] = mapping[inv] || [];
                 if(!mapping[inv].includes(cat)) mapping[inv].push(cat);
             });
-            // send to Apps Script as JSON POST
-            await fetch(GAS_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ syncCategories: true, categories: mapping })
-            });
+            // send to Apps Script as urlencoded form to avoid CORS preflight
+            const body = new URLSearchParams({ syncCategories: '1', categories: JSON.stringify(mapping) }).toString();
+            await fetch(GAS_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }, body });
             console.log('Categories synced to Apps Script', mapping);
         }catch(err){ console.warn('Sync categories to GAS failed', err); }
     }
@@ -430,64 +397,37 @@
                         }
                     });
 
-                    // Always attempt to send to Apps Script; fallback to local on error
+                    // Send to Apps Script as URL-encoded form (image as base64 field). On error, save locally.
                     try{
-                        if(serverAvailable){
-                            // send to local server which handles multipart and forwards to Apps Script
-                            const form = new FormData();
-                            form.append('category', cat);
-                            form.append('item', JSON.stringify(data));
-                            // attach image as Blob if available
-                            if(data.imageBase64){
-                                const byteChars = atob(data.imageBase64);
-                                const byteNumbers = new Array(byteChars.length);
-                                for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
-                                const byteArray = new Uint8Array(byteNumbers);
-                                const blob = new Blob([byteArray], { type: data.imageMime || 'image/png' });
-                                form.append('image', blob, data.imageName || 'image.png');
-                            }
-                            const res = await fetch(SERVER_BASE + '/api/item', { method: 'POST', body: form });
-                            const txt = await res.text();
-                            let j = {};
-                            try{ j = txt ? JSON.parse(txt) : {}; }catch(e){ console.warn('Invalid JSON from local server', e, txt); }
-                            if(j && j.ok){
-                                if(dup>=0){ arr[dup].cantidad = (parseInt(arr[dup].cantidad)||0) + (parseInt(data.cantidad)||0); alert('Duplicado: cantidad sumada.'); }
-                                else { arr.push(data); alert('Producto agregado.'); }
-                                saveInventory(); renderTable(cat, busqueda.value);
-                            } else {
-                                throw new Error((j && j.error) ? j.error : 'Respuesta inválida del servidor');
-                            }
+                        const invId = CATEGORY_TO_INVENTORY[cat] || '1';
+                        const payloadObj = {
+                            inventory: invId,
+                            category: cat,
+                            name: data.nombre || data.linea || data.nombre || '',
+                            sku: data.codigo || data.serie || '',
+                            quantity: data.cantidad || 0,
+                            notes: JSON.stringify(data),
+                            imageBase64: data.imageBase64 || '',
+                            imageName: data.imageName || '',
+                            imageMime: data.imageMime || 'image/png'
+                        };
+                        const bodyStr = new URLSearchParams(payloadObj).toString();
+                        console.log('Sending urlencoded payload to GAS:', GAS_URL, payloadObj);
+                        const res = await fetch(GAS_URL, { method: 'POST', headers: {'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'}, body: bodyStr });
+                        console.log('GAS response status:', res.status, res.statusText);
+                        const txt = await res.text();
+                        console.log('GAS response body:', txt);
+                        let j = {};
+                        try{ j = txt ? JSON.parse(txt) : {}; }catch(err){ console.warn('Invalid JSON from GAS', err, txt); }
+                        if(j && j.ok){
+                            if(dup>=0){ arr[dup].cantidad = (parseInt(arr[dup].cantidad)||0) + (parseInt(data.cantidad)||0); alert('Duplicado: cantidad sumada.'); }
+                            else { arr.push(data); alert('Producto agregado.'); }
+                            saveInventory(); renderTable(cat, busqueda.value);
                         } else {
-                            // send JSON directly to Apps Script (avoid multipart/form-data)
-                            const invId = CATEGORY_TO_INVENTORY[cat] || '1';
-                            const payload = {
-                                inventory: invId,
-                                category: cat,
-                                name: data.nombre || data.linea || data.nombre || '',
-                                sku: data.codigo || data.serie || '',
-                                quantity: data.cantidad || 0,
-                                notes: JSON.stringify(data),
-                                imageBase64: data.imageBase64 || '',
-                                imageName: data.imageName || '',
-                                imageMime: data.imageMime || 'image/png'
-                            };
-                            console.log('Sending payload to GAS:', GAS_URL, payload);
-                            const res = await fetch(GAS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-                            console.log('GAS response status:', res.status, res.statusText);
-                            const txt = await res.text();
-                            console.log('GAS response body:', txt);
-                            let j = {};
-                            try{ j = txt ? JSON.parse(txt) : {}; }catch(e){ console.warn('Invalid JSON from GAS', e, txt); }
-                            if(j && j.ok){
-                                if(dup>=0){ arr[dup].cantidad = (parseInt(arr[dup].cantidad)||0) + (parseInt(data.cantidad)||0); alert('Duplicado: cantidad sumada.'); }
-                                else { arr.push(data); alert('Producto agregado.'); }
-                                saveInventory(); renderTable(cat, busqueda.value);
-                            } else {
-                                const msg = (j && j.error) ? j.error : (txt || ('HTTP ' + res.status));
-                                console.warn('GAS returned error:', msg);
-                                alert('Error al guardar en servidor remoto: ' + msg + '\nVer consola para más detalles.');
-                                throw new Error(msg);
-                            }
+                            const msg = (j && j.error) ? j.error : (txt || ('HTTP ' + res.status));
+                            console.warn('GAS returned error:', msg);
+                            alert('Error al guardar en servidor remoto: ' + msg + '\nVer consola para más detalles.');
+                            throw new Error(msg);
                         }
                     }catch(e){
                         console.warn('Enviar item al servidor falló, guardando localmente',e);
