@@ -36,7 +36,7 @@
         <div class="controls">
             <label style="white-space:nowrap">Categoría:</label>
             <select id="categoriaSel">
-                <option value="todas">Todas</option>
+                <option value="todas" selected>Todas</option>
                 <option value="vidrio">Vidrio</option>
                 <option value="aluminio">Aluminio</option>
                 <option value="herrajes">Herrajes</option>
@@ -80,7 +80,7 @@
         </div>
     </div>
 
-    <script src="/socket.io/socket.io.js"></script>
+    <!-- socket.io script loaded dynamically when available -->
     <script>
     // --- Data load ---
     const usuarioActivoEl = document.getElementById('usuarioActivo');
@@ -97,23 +97,40 @@
     const cancelSearchBtn = document.getElementById('cancelSearch');
     const adminPanel = document.getElementById('adminPanel');
 
+    // ensure a sane default category to avoid rendering nothing
+    if(categoriaSel && !categoriaSel.value) categoriaSel.value = 'todas';
+
     let inventory = JSON.parse(localStorage.getItem('inventory_v1')) || {vidrio:[],aluminio:[],herrajes:[],insumos:[]};
     // server sync flag
     let serverAvailable = false;
     let socket = null;
+    // local server base (adjust if your server runs on a different host/port)
+    const SERVER_BASE = 'http://localhost:3000';
 
     // try to detect server
     (async function detectServer(){
-        try{
-            const res = await fetch('/api/ping');
-            if(res.ok){ serverAvailable = true; console.log('Server detected');
-                // fetch server inventory and use it
-                const invRes = await fetch('/api/inventory');
-                if(invRes.ok){ inventory = await invRes.json(); localStorage.setItem('inventory_v1', JSON.stringify(inventory)); }
-                // connect socket
-                try{ socket = io(); socket.on('inventory-updated', data=>{ inventory = data; localStorage.setItem('inventory_v1', JSON.stringify(inventory)); renderTable(categoriaSel.value, busqueda.value); }); }catch(e){ console.warn('socket connect failed',e); }
-            }
-        }catch(e){ console.log('No server detected, working offline'); }
+        // Try local server first, then same-origin fallback
+        const tryUrls = [SERVER_BASE + '/api/ping', '/api/ping'];
+        for(const url of tryUrls){
+                        try{
+                const res = await fetch(url);
+                if(res.ok){
+                    serverAvailable = true; console.log('Server detected at', url);
+                    // fetch server inventory and use it
+                    try{
+                        const invRes = await fetch(url.replace('/api/ping','/api/inventory'));
+                        if(invRes.ok){
+                            const txt = await invRes.text();
+                            try{ if(txt) inventory = JSON.parse(txt); localStorage.setItem('inventory_v1', JSON.stringify(inventory)); }catch(e){ console.warn('Failed parsing inventory JSON', e, txt); }
+                        }
+                    }catch(e){ console.warn('Failed fetching inventory from', url, e); }
+                    // connect socket (only works if same origin or socket server accessible)
+                    try{ socket = io(); socket.on('inventory-updated', data=>{ inventory = data; localStorage.setItem('inventory_v1', JSON.stringify(inventory)); renderTable(categoriaSel.value, busqueda.value); }); }catch(e){ console.warn('socket connect failed',e); }
+                    break;
+                }
+            }catch(e){ /* ignore and try next */ }
+        }
+        if(!serverAvailable) console.log('No server detected, working offline');
     })();
     // migrate legacy 'medida' -> 'medida1'/'medida2' for vidrio items
     if(inventory && inventory.vidrio && Array.isArray(inventory.vidrio)){
@@ -124,59 +141,40 @@
                 it.medida2 = parts[1] || '';
             }
         });
-        // persist migration
-        localStorage.setItem('inventory_v1', JSON.stringify(inventory));
     }
-    let usuarios = JSON.parse(localStorage.getItem('usuarios')) || {};
-    let log = JSON.parse(localStorage.getItem('log')) || [];
-    let activo = localStorage.getItem('activo') || null;
+    // URL de tu Apps Script desplegado (exec) - versión actualizada
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbzKLSsxgIP8H__ZSLr5yHD086tCQyKR836ojE9dYBH1aMd2Tt02pyzwgHpI013jy2DK/exec';
+    // Mapear categoría UI -> id de inventario en Apps Script (ajusta según tu configuración)
+    const CATEGORY_TO_INVENTORY = { aluminio: '1', herrajes: '2', vidrio: '3', insumos: '4' };
 
-    async function saveInventory(){
-        localStorage.setItem('inventory_v1', JSON.stringify(inventory));
-        if(serverAvailable){
-            try{
-                await fetch('/api/inventory', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(inventory) });
-                console.log('Inventory synced to server');
-            }catch(e){ console.warn('Sync to server failed, keeping local copy',e); try{ autoExport(); }catch(e2){} }
-        } else {
-            try{ autoExport(); }catch(e){ console.warn('Auto-export falló',e); }
-        }
-    }
-    function saveUsers(){ localStorage.setItem('usuarios', JSON.stringify(usuarios)); }
-    function saveLog(){ localStorage.setItem('log', JSON.stringify(log)); }
-
-    // Auto-export current data: inventory JSON, usuarios TXT, log CSV
-    function autoExport(){
-        const ts = new Date();
-        const pad = n=> n.toString().padStart(2,'0');
-        const nameBase = `export_${ts.getFullYear()}${pad(ts.getMonth()+1)}${pad(ts.getDate())}_${pad(ts.getHours())}${pad(ts.getMinutes())}${pad(ts.getSeconds())}`;
-        // inventory JSON
-        const invBlob = new Blob([JSON.stringify(inventory, null, 2)], {type:'application/json'});
-        const a1 = document.createElement('a'); a1.href=URL.createObjectURL(invBlob); a1.download = nameBase + '_inventory.json'; a1.style.display='none'; document.body.appendChild(a1); a1.click(); a1.remove();
-        // usuarios TXT
-        try{
-            const lines = [];
-            for(const u in usuarios){ lines.push(`${u},${usuarios[u].pass},${usuarios[u].autorizado}`); }
-            const uBlob = new Blob([lines.join('\n')], {type:'text/plain'});
-            const a2 = document.createElement('a'); a2.href=URL.createObjectURL(uBlob); a2.download = nameBase + '_usuarios.txt'; a2.style.display='none'; document.body.appendChild(a2); a2.click(); a2.remove();
-        }catch(e){ console.warn('Export usuarios falló',e); }
-        // log CSV
-        try{
-            let csv = 'Fecha,Usuario,Accion\n';
-            log.forEach(l=> csv += `${l.fecha.replace(/,/g,' ')} , ${l.usuario} , ${l.accion.replace(/,/g,' ')}\n`);
-            const lBlob = new Blob([csv], {type:'text/csv'});
-            const a3 = document.createElement('a'); a3.href=URL.createObjectURL(lBlob); a3.download = nameBase + '_log.csv'; a3.style.display='none'; document.body.appendChild(a3); a3.click(); a3.remove();
-        }catch(e){ console.warn('Export log falló',e); }
-        console.log('Auto-export completed', nameBase);
-    }
-    function makeId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
-
+    // Templates (campos por categoría)
     const templates = {
         vidrio: ['image','tipo','color','grosor','forma','medida1','medida2','cantidad'],
         aluminio: ['image','linea','serie','nombre','color','codigo','cantidad'],
         herrajes: ['image','nombre','color','codigo','cantidad'],
-        insumos: ['image','nombre','tipo','color','codigo','cantidad']
+        insumos: ['image','nombre','tipo','color','codigo','cantidad','acciones']
     };
+
+    // Sync categories from this frontend templates -> Apps Script
+    async function syncCategoriesToGAS(){
+        try{
+            const mapping = {};
+            // build inventoryId -> [categories]
+            Object.keys(templates).forEach(cat => {
+                const inv = CATEGORY_TO_INVENTORY[cat] || null;
+                if(!inv) return;
+                mapping[inv] = mapping[inv] || [];
+                if(!mapping[inv].includes(cat)) mapping[inv].push(cat);
+            });
+            // send to Apps Script as JSON POST
+            await fetch(GAS_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ syncCategories: true, categories: mapping })
+            });
+            console.log('Categories synced to Apps Script', mapping);
+        }catch(err){ console.warn('Sync categories to GAS failed', err); }
+    }
 
     // helper: all categories list
     const allCategories = Object.keys(templates);
@@ -200,6 +198,17 @@
         });
     }
 
+    // --- Minimal app state helpers (define commonly used globals) ---
+    const activo = localStorage.getItem('activo') || null;
+    let usuarios = JSON.parse(localStorage.getItem('usuarios_v1') || '{}');
+    let log = JSON.parse(localStorage.getItem('log_v1') || '[]');
+
+    function saveInventory(){ try{ localStorage.setItem('inventory_v1', JSON.stringify(inventory)); }catch(e){ console.warn('saveInventory failed',e); } }
+    function saveUsers(){ try{ localStorage.setItem('usuarios_v1', JSON.stringify(usuarios)); }catch(e){ console.warn('saveUsers failed',e); } }
+    function saveLog(){ try{ localStorage.setItem('log_v1', JSON.stringify(log)); }catch(e){ console.warn('saveLog failed',e); } }
+
+    function makeId(){ return 'id_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8); }
+
     // --- Advanced search UI ---
     function openAdvancedSearch(){
         searchSteps.innerHTML = '';
@@ -208,6 +217,7 @@
         const step1 = document.createElement('div'); step1.style.marginBottom='8px';
         const lbl1 = document.createElement('label'); lbl1.innerText='Paso 1: Seleccione categoría:'; step1.appendChild(lbl1);
         const sel1 = document.createElement('select'); sel1.style.width='100%';
+        sel1.dataset.catchooser = '1'; // <-- marcado para identificar el selector principal
         const opAll = document.createElement('option'); opAll.value='todas'; opAll.innerText='Todas'; sel1.appendChild(opAll);
         allCategories.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.innerText=c; sel1.appendChild(o); });
         sel1.value = categoriaSel.value || 'todas';
@@ -230,7 +240,9 @@
         if(cat==='todas'){
             // ask user to pick one category to filter fields
             const p = document.createElement('div'); const lbl = document.createElement('label'); lbl.innerText='Seleccione una categoría para definir los campos:'; p.appendChild(lbl);
-            const sel = document.createElement('select'); sel.style.width='100%'; allCategories.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.innerText=c; sel.appendChild(o); });
+            const sel = document.createElement('select'); sel.style.width='100%';
+            sel.dataset.catchooser = '1'; // <-- marcado para identificar este selector también
+            allCategories.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.innerText=c; sel.appendChild(o); });
             p.appendChild(sel); container.appendChild(p);
             sel.addEventListener('change', ()=> buildFieldSelectors(sel.value));
             return;
@@ -256,16 +268,15 @@
     }
 
     function applyAdvancedSearch(){
-        // read chosen category (first select in searchSteps)
-        const selCat = searchSteps.querySelector('select');
+        // read chosen category selector (use marker to avoid ambiguity)
+        const selCat = searchSteps.querySelector('select[data-catchooser]') || searchSteps.querySelector('select');
         if(!selCat) return;
         let chosenCat = selCat.value;
-        // if chosenCat is 'todas' and there's a second select to pick category, use it
         const stepFields = document.getElementById('searchStepFields');
-        const innerSelect = stepFields.querySelector('select');
-        if(chosenCat==='todas' && innerSelect && innerSelect.dataset.field===undefined){
-            // this inner select is the one to choose a category
-            chosenCat = innerSelect.value;
+        // if chosenCat is 'todas' and there's an inner category selector marked, use it
+        if(chosenCat==='todas'){
+            const innerCat = stepFields.querySelector('select[data-catchooser]');
+            if(innerCat) chosenCat = innerCat.value;
         }
         // gather criteria
         const criteria = { category: chosenCat, conditions: {} };
@@ -330,6 +341,17 @@
                     tbody.appendChild(tr);
                 }catch(err){ console.error('Error renderTableWithCriteria item',item,err); }
             });
+            if(tbody.childElementCount === 0){
+                const emptyTr = document.createElement('tr');
+                const emptyTd = document.createElement('td');
+                emptyTd.colSpan = templates[c].length + 1;
+                emptyTd.style.textAlign = 'center';
+                emptyTd.style.color = '#666';
+                emptyTd.style.padding = '12px';
+                emptyTd.innerText = 'Sin productos en esta categoría';
+                emptyTr.appendChild(emptyTd);
+                tbody.appendChild(emptyTr);
+            }
             tbl.appendChild(tbody); cont.appendChild(tbl); tablesArea.appendChild(cont);
         };
         renderCategory(cat);
@@ -371,11 +393,14 @@
             wrapper.appendChild(col);
         });
         const btns = document.createElement('div'); btns.style.width='100%'; btns.style.marginTop='8px';
-        const save = document.createElement('button'); save.innerText='Guardar'; save.onclick = ()=>{
+        const save = document.createElement('button'); save.innerText='Guardar'; save.onclick = async ()=>{
             try{
                 const data = {id: makeId()};
                 let pendingFile = false;
-                    function finalize(){
+
+                async function finalize(){
+                    // ensure category array exists
+                    inventory[cat] = inventory[cat] || [];
                     const arr = inventory[cat];
                     let dup = -1;
                     arr.forEach((it,i)=>{
@@ -389,30 +414,100 @@
                             if(it.nombre===data.nombre && it.tipo===data.tipo && it.codigo===data.codigo) dup=i;
                         }
                     });
-                    if(dup>=0){ arr[dup].cantidad = (parseInt(arr[dup].cantidad)||0) + (parseInt(data.cantidad)||0); alert('Duplicado: cantidad sumada.'); }
-                    else { arr.push(data); alert('Producto agregado.'); }
-                    // if server available, send item to server (including possible imagePath handled earlier)
-                    if(serverAvailable){
-                        try{
-                            // POST /api/item with formdata
+
+                    // Always attempt to send to Apps Script; fallback to local on error
+                    try{
+                        if(serverAvailable){
+                            // send to local server which handles multipart and forwards to Apps Script
                             const form = new FormData();
                             form.append('category', cat);
                             form.append('item', JSON.stringify(data));
-                            // if imageFile present in inputs, attach
-                            if(data._imageFile){ form.append('image', data._imageFile); delete data._imageFile; }
-                            fetch('/api/item', { method:'POST', body: form }).then(r=>r.json()).then(j=>{ if(j.inventory){ inventory = j.inventory; localStorage.setItem('inventory_v1', JSON.stringify(inventory)); renderTable(categoriaSel.value, busqueda.value); } }).catch(e=>{ console.warn('Enviar item al servidor falló',e); saveInventory(); renderTable(cat, busqueda.value); });
-                    } else {
+                            // attach image as Blob if available
+                            if(data.imageBase64){
+                                const byteChars = atob(data.imageBase64);
+                                const byteNumbers = new Array(byteChars.length);
+                                for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+                                const byteArray = new Uint8Array(byteNumbers);
+                                const blob = new Blob([byteArray], { type: data.imageMime || 'image/png' });
+                                form.append('image', blob, data.imageName || 'image.png');
+                            }
+                            const res = await fetch(SERVER_BASE + '/api/item', { method: 'POST', body: form });
+                            const txt = await res.text();
+                            let j = {};
+                            try{ j = txt ? JSON.parse(txt) : {}; }catch(e){ console.warn('Invalid JSON from local server', e, txt); }
+                            if(j && j.ok){
+                                if(dup>=0){ arr[dup].cantidad = (parseInt(arr[dup].cantidad)||0) + (parseInt(data.cantidad)||0); alert('Duplicado: cantidad sumada.'); }
+                                else { arr.push(data); alert('Producto agregado.'); }
+                                saveInventory(); renderTable(cat, busqueda.value);
+                            } else {
+                                throw new Error((j && j.error) ? j.error : 'Respuesta inválida del servidor');
+                            }
+                        } else {
+                            // send JSON directly to Apps Script (avoid multipart/form-data)
+                            const invId = CATEGORY_TO_INVENTORY[cat] || '1';
+                            const payload = {
+                                inventory: invId,
+                                category: cat,
+                                name: data.nombre || data.linea || data.nombre || '',
+                                sku: data.codigo || data.serie || '',
+                                quantity: data.cantidad || 0,
+                                notes: JSON.stringify(data),
+                                imageBase64: data.imageBase64 || '',
+                                imageName: data.imageName || '',
+                                imageMime: data.imageMime || 'image/png'
+                            };
+                            console.log('Sending payload to GAS:', GAS_URL, payload);
+                            const res = await fetch(GAS_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+                            console.log('GAS response status:', res.status, res.statusText);
+                            const txt = await res.text();
+                            console.log('GAS response body:', txt);
+                            let j = {};
+                            try{ j = txt ? JSON.parse(txt) : {}; }catch(e){ console.warn('Invalid JSON from GAS', e, txt); }
+                            if(j && j.ok){
+                                if(dup>=0){ arr[dup].cantidad = (parseInt(arr[dup].cantidad)||0) + (parseInt(data.cantidad)||0); alert('Duplicado: cantidad sumada.'); }
+                                else { arr.push(data); alert('Producto agregado.'); }
+                                saveInventory(); renderTable(cat, busqueda.value);
+                            } else {
+                                const msg = (j && j.error) ? j.error : (txt || ('HTTP ' + res.status));
+                                console.warn('GAS returned error:', msg);
+                                alert('Error al guardar en servidor remoto: ' + msg + '\nVer consola para más detalles.');
+                                throw new Error(msg);
+                            }
+                        }
+                    }catch(e){
+                        console.warn('Enviar item al servidor falló, guardando localmente',e);
+                        if(dup>=0){ arr[dup].cantidad = (parseInt(arr[dup].cantidad)||0) + (parseInt(data.cantidad)||0); alert('Duplicado: cantidad sumada (local).'); }
+                        else { arr.push(data); alert('Producto agregado (local).'); }
                         saveInventory(); renderTable(cat, busqueda.value);
                     }
+
                     formArea.classList.add('hidden');
                 }
-                fields.forEach(k=>{
+
+                // collect fields and handle image conversion
+                function fileToDataURL(file){
+                    return new Promise((resolve, reject)=>{
+                        const reader = new FileReader();
+                        reader.onload = e => resolve(e.target.result);
+                        reader.onerror = e => reject(e);
+                        reader.readAsDataURL(file);
+                    });
+                }
+
+                for(const k of fields){
                     if(k==='image'){
                         const f = inputs[k] && inputs[k].files && inputs[k].files[0];
                         if(f){
-                            // attach file for server upload path; keep fallback dataURL
-                            if(serverAvailable){ data._imageFile = f; pendingFile = false; }
-                            else { pendingFile = true; const reader = new FileReader(); reader.onload = e=>{ data.imageData = e.target.result; data.imageName = f.name; pendingFile = false; finalize(); }; reader.readAsDataURL(f); }
+                            pendingFile = true;
+                            try{
+                                const dataUrl = await fileToDataURL(f);
+                                data.imageData = dataUrl; // data URL for immediate preview/local storage
+                                const base64 = dataUrl.split(',')[1] || '';
+                                data.imageBase64 = base64;
+                                data.imageName = f.name;
+                                data.imageMime = f.type || 'image/png';
+                            }catch(err){ console.warn('File read failed',err); }
+                            pendingFile = false;
                         }
                     } else if(k==='cantidad'){
                         const el = inputs[k]; data[k] = parseInt((el && el.value) || 0) || 0;
@@ -425,8 +520,9 @@
                         }
                         data[k] = val;
                     }
-                });
-                if(!pendingFile) finalize();
+                }
+
+                if(!pendingFile) await finalize();
             }catch(err){ console.error('Error en guardar nuevo producto',err); alert('Error al guardar (ver consola)'); }
         };
         const cancel = document.createElement('button'); cancel.innerText='Cancelar'; cancel.onclick=()=>{ formArea.classList.add('hidden'); };
@@ -435,61 +531,77 @@
 
     // --- Table rendering ---
     function renderTable(cat, filter=''){
-        console.log('renderTable start',cat,filter);
-        const field = filterField? filterField.value : 'Todos';
-        const q = (filter||'').toString().trim().toLowerCase();
-        tablesArea.innerHTML = '';
-        const renderCategory = (c)=>{
-            if(!templates[c]) return;
-            const cont = document.createElement('div'); cont.className='container';
-            const h = document.createElement('h3'); h.innerText = c.toUpperCase(); cont.appendChild(h);
-            const tbl = document.createElement('table');
-            const thead = document.createElement('thead'); const hr = document.createElement('tr');
-            templates[c].forEach(col=>{ const th=document.createElement('th'); th.innerText=col.toUpperCase(); hr.appendChild(th); });
-            const tha = document.createElement('th'); tha.innerText='ACCIONES'; hr.appendChild(tha); thead.appendChild(hr); tbl.appendChild(thead);
-            const tbody = document.createElement('tbody');
-            (inventory[c]||[]).forEach(item=>{
-                try{
-                    // match depending on selected field
-                    let match = true;
-                    if(q){
-                        if(field==='Todos'){
-                            const text = (Object.values(item).join(' ') + ' ' + c).toLowerCase(); match = text.includes(q);
-                        } else if(field==='categoria'){
-                            match = c.toLowerCase().includes(q);
-                        } else {
-                            const val = (item[field] || '').toString().toLowerCase(); match = val.includes(q);
+        try {
+            console.log('renderTable start',cat,filter);
+            const field = filterField? filterField.value : 'Todos';
+            const q = (filter||'').toString().trim().toLowerCase();
+            tablesArea.innerHTML = '';
+            const renderCategory = (c)=>{
+                if(!templates[c]) return;
+                const cont = document.createElement('div'); cont.className='container';
+                const h = document.createElement('h3'); h.innerText = c.toUpperCase(); cont.appendChild(h);
+                const tbl = document.createElement('table');
+                const thead = document.createElement('thead'); const hr = document.createElement('tr');
+                templates[c].forEach(col=>{ const th=document.createElement('th'); th.innerText=col.toUpperCase(); hr.appendChild(th); });
+                const tha = document.createElement('th'); tha.innerText='ACCIONES'; hr.appendChild(tha); thead.appendChild(hr); tbl.appendChild(thead);
+                const tbody = document.createElement('tbody');
+                (inventory[c]||[]).forEach(item=>{
+                    try{
+                        // match depending on selected field
+                        let match = true;
+                        if(q){
+                            if(field==='Todos'){
+                                const text = (Object.values(item).join(' ') + ' ' + c).toLowerCase(); match = text.includes(q);
+                            } else if(field==='categoria'){
+                                match = c.toLowerCase().includes(q);
+                            } else {
+                                const val = (item[field] || '').toString().toLowerCase(); match = val.includes(q);
+                            }
                         }
-                    }
-                    if(!match) return;
-                    const tr = document.createElement('tr');
-                    templates[c].forEach(key=>{
-                        const td = document.createElement('td');
-                        if(key==='image'){
-                            if(item.imageData){ const img=document.createElement('img'); img.src=item.imageData; img.style.height='40px'; td.appendChild(img); }
-                            else if(item.imageName) td.innerText = item.imageName; else td.innerText = '-';
-                        } else td.innerText = item[key] || '';
-                        tr.appendChild(td);
-                    });
-                    const tdA = document.createElement('td'); tdA.className='actions';
-                    const inBtn = document.createElement('button'); inBtn.innerText='Entrada';
-                    inBtn.addEventListener('click', ()=>{ try{ const q=parseInt(prompt('Cantidad a agregar')||0); if(!q) return; item.cantidad=(parseInt(item.cantidad)||0)+q; saveInventory(); renderTable(cat,filter); }catch(e){ console.error('Entrada error',e); alert('Error en entrada (ver consola)'); } });
-                    const outBtn = document.createElement('button'); outBtn.innerText='Salida';
-                    outBtn.addEventListener('click', ()=>{ try{ const q=parseInt(prompt('Cantidad a retirar')||0); if(!q) return; if((item.cantidad||0)<q) return alert('Stock insuficiente'); item.cantidad=(parseInt(item.cantidad)||0)-q; saveInventory(); renderTable(cat,filter); }catch(e){ console.error('Salida error',e); alert('Error en salida (ver consola)'); } });
-                    const delBtn = document.createElement('button'); delBtn.innerText='Eliminar';
-                    delBtn.addEventListener('click', ()=>{ try{ if(!confirm('Eliminar producto?')) return; inventory[c]=inventory[c].filter(x=>x.id!==item.id); saveInventory(); renderTable(cat,filter); }catch(e){ console.error('Eliminar error',e); alert('Error al eliminar (ver consola)'); } });
-                    tdA.appendChild(inBtn); tdA.appendChild(outBtn); tdA.appendChild(delBtn); tr.appendChild(tdA);
-                    tbody.appendChild(tr);
-                }catch(err){ console.error('Error renderTable item',item,err); }
-            });
-            tbl.appendChild(tbody); cont.appendChild(tbl); tablesArea.appendChild(cont);
-        };
+                        if(!match) return;
+                        const tr = document.createElement('tr');
+                        templates[c].forEach(key=>{
+                            const td = document.createElement('td');
+                            if(key==='image'){
+                                if(item.imageData){ const img=document.createElement('img'); img.src=item.imageData; img.style.height='40px'; td.appendChild(img); }
+                                else if(item.imageName) td.innerText = item.imageName; else td.innerText = '-';
+                            } else td.innerText = item[key] || '';
+                            tr.appendChild(td);
+                        });
+                        const tdA = document.createElement('td'); tdA.className='actions';
+                        const inBtn = document.createElement('button'); inBtn.innerText='Entrada';
+                        inBtn.addEventListener('click', ()=>{ try{ const q=parseInt(prompt('Cantidad a agregar')||0); if(!q) return; item.cantidad=(parseInt(item.cantidad)||0)+q; saveInventory(); renderTable(cat,filter); }catch(e){ console.error('Entrada error',e); alert('Error en entrada (ver consola)'); } });
+                        const outBtn = document.createElement('button'); outBtn.innerText='Salida';
+                        outBtn.addEventListener('click', ()=>{ try{ const q=parseInt(prompt('Cantidad a retirar')||0); if(!q) return; if((item.cantidad||0)<q) return alert('Stock insuficiente'); item.cantidad=(parseInt(item.cantidad)||0)-q; saveInventory(); renderTable(cat,filter); }catch(e){ console.error('Salida error',e); alert('Error en salida (ver consola)'); } });
+                        const delBtn = document.createElement('button'); delBtn.innerText='Eliminar';
+                        delBtn.addEventListener('click', ()=>{ try{ if(!confirm('Eliminar producto?')) return; inventory[c]=inventory[c].filter(x=>x.id!==item.id); saveInventory(); renderTable(cat,filter); }catch(e){ console.error('Eliminar error',e); alert('Error al eliminar (ver consola)'); } });
+                        tdA.appendChild(inBtn); tdA.appendChild(outBtn); tdA.appendChild(delBtn); tr.appendChild(tdA);
+                        tbody.appendChild(tr);
+                    }catch(err){ console.error('Error renderTable item',item,err); }
+                });
+                if(tbody.childElementCount === 0){
+                    const emptyTr = document.createElement('tr');
+                    const emptyTd = document.createElement('td');
+                    emptyTd.colSpan = templates[c].length + 1;
+                    emptyTd.style.textAlign = 'center';
+                    emptyTd.style.color = '#666';
+                    emptyTd.style.padding = '12px';
+                    emptyTd.innerText = 'Sin productos en esta categoría';
+                    emptyTr.appendChild(emptyTd);
+                    tbody.appendChild(emptyTr);
+                }
+                tbl.appendChild(tbody); cont.appendChild(tbl); tablesArea.appendChild(cont);
+            };
 
-        if(cat==='todas'){
-            allCategories.forEach(c=> renderCategory(c));
-        } else {
-            if(!templates[cat]){ console.error('renderTable: categoría inválida',cat); return; }
-            renderCategory(cat);
+            if(!cat || cat==='todas'){
+                allCategories.forEach(c=> renderCategory(c));
+            } else {
+                if(!templates[cat]){ console.warn('renderTable: categoría inválida, mostrando todas'); allCategories.forEach(c=> renderCategory(c)); return; }
+                renderCategory(cat);
+            }
+        } catch(err) {
+            console.error('renderTable fallo', err);
+            tablesArea.innerHTML = '<div style="padding:12px;background:#fff3f3;border-radius:6px;color:#900">Error al renderizar tablas. Revisa la consola (F12).</div>';
         }
     }
 
@@ -512,7 +624,7 @@
         btnAdvancedSearch.addEventListener('click', ()=>{ openAdvancedSearch(); });
         applySearchBtn.addEventListener('click', ()=>{ applyAdvancedSearch(); });
         cancelSearchBtn.addEventListener('click', ()=>{ cancelSearch(); });
-        btnNew.addEventListener('click', ()=>{ console.log('btnNew clicked for',categoriaSel.value); renderForm(categoriaSel.value); });
+        btnNew.addEventListener('click', ()=>{ console.log('btnNew clicked for',categoriaSel.value); const catSel = categoriaSel.value; if(!catSel || catSel==='todas'){ alert('Seleccione una categoría específica antes de agregar un producto.'); return; } renderForm(catSel); });
         btnLogout.addEventListener('click', ()=>{ try{ localStorage.removeItem('activo'); location.href='index.html'; }catch(e){ console.error('logout error',e); } });
     }catch(err){ console.error('Error wiring events',err); }
 
@@ -520,9 +632,17 @@
     if(!activo){ alert('No estás autenticado'); location.href='index.html'; }
     usuarioActivoEl.innerText = activo;
     if(activo==='admin'){ adminPanel.classList.remove('hidden'); actualizarUsuariosAdmin(); actualizarLogAdmin(); }
-    // populate filter options and initial render
-    populateFilterOptions(categoriaSel.value);
-    renderTable(categoriaSel.value);
+    // populate filter options and initial render (protegido)
+    try{
+        populateFilterOptions(categoriaSel.value);
+        // attempt to sync categories with Apps Script (best-effort)
+        try{ syncCategoriesToGAS(); }catch(e){}
+        renderTable(categoriaSel.value);
+    }catch(e){
+        console.error('Inicialización falló',e);
+        // fallback: force 'todas' and render minimal UI
+        try{ categoriaSel.value='todas'; populateFilterOptions('todas'); renderTable('todas'); }catch(e2){ tablesArea.innerHTML = '<div style="padding:12px;background:#fff3f3;border-radius:6px;color:#900">No se pudieron mostrar las tablas. Ver consola.</div>'; }
+    }
 
     </script>
 

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PDF técnico — Aluoferta</title>
+<style>
+/* Móvil primero, diseño limpio en azul marino */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+:root{ --navy:#0b2540; --accent:#1f6aa5; --bg:#f2f7fb; --card:#ffffff; --muted:#6b7280 }
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--navy);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.container{width:100%;max-width:520px;background:var(--card);border-radius:12px;padding:18px;box-shadow:0 10px 30px rgba(11,37,64,0.06);border:1px solid rgba(11,37,64,0.04);text-align:center}
+.logo{width:64px;height:64px;object-fit:contain;margin:6px auto 10px;border-radius:8px;background:#fff;padding:8px;border:1px solid rgba(11,37,64,0.04)}
+h1{margin:6px 0 8px;font-size:18px;font-weight:700;color:var(--navy)}
+.lead{margin:0 0 14px;color:var(--muted);font-size:14px}
+.buttons{display:flex;flex-direction:column;gap:10px}
+@media(min-width:640px){ .buttons{flex-direction:row;justify-content:center} .btn{min-width:150px} }
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:12px 14px;border-radius:10px;border:none;cursor:pointer;font-weight:700;font-size:14px;text-decoration:none}
+.btn-primary{background:linear-gradient(180deg,var(--navy),var(--accent));color:#fff;box-shadow:0 8px 20px rgba(31,106,165,0.12)}
+.btn-outline{background:transparent;border:1.5px solid var(--navy);color:var(--navy)}
+.note{font-size:13px;color:var(--muted);margin-top:12px}
+.footer{font-size:12px;color:var(--muted);margin-top:10px}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0;">
+    <img src="img/aluoferta_logo.png" alt="Aluoferta" class="logo">
+    <a href="index.html" class="btn btn-outline" style="white-space:nowrap">Volver al inicio</a>
+  </div>
+  <h1>Catálogo técnico — Aluoferta</h1>
+  <p class="lead">Elige el PDF que deseas abrir</p>
+
+  <div class="buttons">
+    <a class="btn btn-primary" href="docs/Catalogo_1400.pdf" target="_blank" rel="noopener">PDF 1400</a>
+    <a class="btn btn-primary" href="docs/Catalogo_3500.pdf" target="_blank" rel="noopener">PDF 3500</a>
+    <a class="btn btn-primary" href="docs/Catalogo_4600.pdf" target="_blank" rel="noopener">PDF 4600</a>
+  </div>
+
+  <div class="note">
+    Se abrirá en una nueva pestaña. Coloca los archivos en:
+    <strong>c:\Users\falco\OneDrive\Escritorio\LEO\aluminio\Discounts\docs\</strong>
+    con los nombres: <code>Catalogo_1400.pdf</code>, <code>Catalogo_3500.pdf</code>, <code>Catalogo_4600.pdf</code>.
+  </div>
+  <div class="footer">© Aluoferta</div>
+</div>
+</body>
+</html>

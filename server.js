@@ -24,6 +24,11 @@ const INVENTORY_FILE = path.join(DATA_DIR, 'inventory_server.json');
 const USERS_FILE = path.join(DATA_DIR, 'usuarios_server.json');
 const LOG_FILE = path.join(DATA_DIR, 'log_server.json');
 
+// Optional: Apps Script endpoint to forward items (set your deployed exec URL)
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzKLSsxgIP8H__ZSLr5yHD086tCQyKR836ojE9dYBH1aMd2Tt02pyzwgHpI013jy2DK/exec';
+// Map server categories to inventory IDs expected by Apps Script
+const CATEGORY_TO_INVENTORY = { aluminio: '1', herrajes: '2', vidrio: '3', insumos: '4' };
+
 function readJson(file, fallback){ try{ if(fs.existsSync(file)) return JSON.parse(fs.readFileSync(file,'utf8')||'{}'); }catch(e){ console.error('readJson error',e); } return fallback; }
 function writeJson(file, obj){ fs.writeFileSync(file, JSON.stringify(obj,null,2),'utf8'); }
 
@@ -84,6 +89,48 @@ app.post('/api/item', upload.single('image'), (req,res)=>{
     io.emit('inventory-updated', inv);
     try{ exportInventoryCSV(inv); }catch(e){ console.warn('CSV export failed',e); }
     res.json({ok:true, inventory:inv});
+
+    // Forward to Apps Script (non-blocking)
+    try{
+      // prepare payload matching Apps Script expectations
+      const invId = CATEGORY_TO_INVENTORY[cat] || '1';
+      const payload = {
+        inventory: invId,
+        category: cat,
+        name: item.nombre || item.linea || item.nombre || '',
+        sku: item.codigo || item.serie || '',
+        quantity: item.cantidad || 0,
+        notes: JSON.stringify(item)
+      };
+      if(req.file){
+        const fpath = req.file.path;
+        const buffer = fs.readFileSync(fpath);
+        payload.imageBase64 = buffer.toString('base64');
+        payload.imageName = req.file.originalname;
+        payload.imageMime = req.file.mimetype || 'application/octet-stream';
+      }
+      // send JSON POST to GAS_URL
+      const u = new URL(GAS_URL);
+      const https = require('https');
+      const data = JSON.stringify(payload);
+      const options = {
+        hostname: u.hostname,
+        path: u.pathname + (u.search || ''),
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(data)
+        }
+      };
+      const reqG = https.request(options, (resp)=>{
+        let respData = '';
+        resp.on('data', chunk=> respData += chunk);
+        resp.on('end', ()=>{ try{ console.log('Forwarded item to Apps Script, status', resp.statusCode); }catch(e){} });
+      });
+      reqG.on('error', err=> console.warn('Error forwarding to Apps Script', err));
+      reqG.write(data);
+      reqG.end();
+    }catch(fwdErr){ console.warn('Forward to Apps Script failed', fwdErr); }
   }catch(e){ console.error('POST /api/item error',e); res.status(500).json({ok:false,error:String(e)}); }
 });
 

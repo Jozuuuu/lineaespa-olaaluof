@@ -1,0 +1,4 @@
+admin,YWRtaW4xMjM=,true
+usuario1,cGFzc3dvcmQx, false
+# Formato: usuario,passBase64,autorizado (true|false)
+# Puedes importar este archivo desde la interfaz de usuarios (Importar).
