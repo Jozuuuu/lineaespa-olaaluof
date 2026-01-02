@@ -320,8 +320,10 @@
     async function loadAllInventory(){
         try{
             console.log('Fetching ALL inventory...');
+            // Use a longer timeout for the big payload (35s)
             const url = GAS_URL + '?action=listAll';
-            const j = await jsonpFetch(url);
+            const j = await jsonpFetch(url, 35000);
+            
             if(j && j.ok && j.data){
                 for(const cat of allCategories){
                     const invId = CATEGORY_TO_INVENTORY[cat];
@@ -333,9 +335,16 @@
                 }
                 console.log('All inventory loaded successfully');
             } else {
-                console.warn('loadAllInventory response invalid', j);
+                console.warn('loadAllInventory response invalid, falling back to sequential load', j);
+                throw new Error('Invalid response from listAll');
             }
-        }catch(e){ console.error('loadAllInventory failed',e); throw e; }
+        }catch(e){ 
+            console.error('loadAllInventory failed, falling back to sequential load',e); 
+            // Fallback: load sequentially
+            for(const cat of allCategories){
+                await loadInventoryForCategory(cat);
+            }
+        }
     }
 
     async function loadInventoryForCategory(cat){
@@ -393,13 +402,15 @@
     }
 
     // JSONP helper: returns parsed JSON
-    function jsonpFetch(url, timeout = 8000){
+    function jsonpFetch(url, timeout = 25000){
         return new Promise((resolve, reject)=>{
             const cbName = '__cb' + Math.random().toString(36).slice(2,10);
             const timer = setTimeout(()=>{ window[cbName] = ()=>{}; reject(new Error('JSONP timeout')); }, timeout);
             window[cbName] = function(data){ clearTimeout(timer); try{ resolve(data); }catch(e){ reject(e); } finally{ try{ script.parentNode.removeChild(script); }catch(e){} delete window[cbName]; } };
             const sep = url.indexOf('?') === -1 ? '?' : '&';
-            const script = document.createElement('script'); script.src = url + sep + 'callback=' + cbName; script.onerror = ()=>{ clearTimeout(timer); delete window[cbName]; script.parentNode.removeChild(script); reject(new Error('JSONP load error')); };
+            // Add cache buster
+            const finalUrl = url + sep + 'callback=' + cbName + '&_t=' + Date.now();
+            const script = document.createElement('script'); script.src = finalUrl; script.onerror = ()=>{ clearTimeout(timer); delete window[cbName]; script.parentNode.removeChild(script); reject(new Error('JSONP load error')); };
             document.head.appendChild(script);
         });
     }
