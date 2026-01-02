@@ -30,6 +30,8 @@ const HEADER_ALIASES = {
 
 function buildHeaderMap(headers){
   const map = {};
+  // defend against invalid input: ensure headers is an array
+  if(!Array.isArray(headers)) headers = [];
   const lower = headers.map(h => (h||'').toString().trim().toLowerCase());
   for(const canonical in HEADER_ALIASES){
     const aliases = HEADER_ALIASES[canonical] || [];
