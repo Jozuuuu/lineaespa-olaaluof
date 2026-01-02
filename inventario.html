@@ -142,8 +142,8 @@
             }
         });
     }
-    // URL de tu Apps Script desplegado (exec) - versión actualizada
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycbyQ9P8njniZrRNfiMGlKUolIkxKKmLExLpKv271_qMWIVkv5j3AqITlFaILE9UmgOr-/exec';
+    // Use Vercel proxy to avoid CORS (deployed proxy forwards to Apps Script)
+    const GAS_URL = 'https://lineaespa-olaaluof-clx8mbvc7-jozuuuus-projects.vercel.app/api/proxy';
     // Mapear categoría UI -> id de inventario en Apps Script (ajusta según tu configuración)
     const CATEGORY_TO_INVENTORY = { aluminio: '1', herrajes: '2', vidrio: '3', insumos: '4' };
 
