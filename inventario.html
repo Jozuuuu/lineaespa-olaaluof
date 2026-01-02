@@ -371,6 +371,23 @@
         }
     }
 
+    // Optimized: Load single item from server (Safety Check)
+    async function loadItemRemote(cat, sku){
+        try{
+            const invId = CATEGORY_TO_INVENTORY[cat];
+            if(!invId) return null;
+            const url = GAS_URL + '?action=get&inventory=' + encodeURIComponent(invId) + '&sku=' + encodeURIComponent(sku);
+            const j = await jsonpFetch(url);
+            if(j && j.ok && j.row){
+                return processRow(j.row, cat);
+            }
+            return null;
+        }catch(err){
+            console.error('loadItemRemote failed',cat,sku,err);
+            return null;
+        }
+    }
+
     // Update quantity on Sheets by sku (uses action=update)
     async function updateQuantityRemote(cat, item, newQty){
         setLoading(true, 'Actualizando cantidad...', false); // Non-blocking update
@@ -391,7 +408,8 @@
             
             if(j && j.ok){
                 console.log('Update success:', j);
-                try{ await loadInventoryForCategory(cat); }catch(e){ console.warn('Reload after update failed',e); }
+                // Optimization: Do NOT reload whole category. We update local state in caller.
+                // try{ await loadInventoryForCategory(cat); }catch(e){ console.warn('Reload after update failed',e); }
                 return true;
             }
             throw new Error((j && j.error) ? j.error : 'Update failed (unknown error)');
@@ -994,20 +1012,25 @@
                                 
                                 // Safety Check: Fetch latest data before modifying
                                 setLoading(true, 'Verificando stock en servidor...', true);
-                                await loadInventoryForCategory(c);
-                                const freshItem = (inventory[c]||[]).find(x => x.id === item.id || x.codigo === item.codigo);
+                                // Optimized: Fetch single item instead of whole category
+                                const freshItem = await loadItemRemote(c, item.codigo || item.sku);
                                 
                                 if(!freshItem){
                                     alert('Error: El producto no se encuentra en el servidor (pudo ser eliminado).');
+                                    // Fallback: reload category just in case
+                                    await loadInventoryForCategory(c);
                                     renderTable(categoriaSel.value, busqueda.value);
                                     return;
                                 }
 
                                 const newQty = (parseInt(freshItem.cantidad)||0) + q; 
                                 await updateQuantityRemote(c, freshItem, newQty); 
-                                // updateQuantityRemote already reloads inventory on success if configured, 
-                                // but we can update local item just in case to reflect immediately if reload is skipped
-                                item.cantidad = newQty; 
+                                
+                                // Update local state manually since we skipped full reload
+                                item.cantidad = newQty;
+                                const mainItem = (inventory[c]||[]).find(x => x.codigo === item.codigo);
+                                if(mainItem) mainItem.cantidad = newQty;
+                                
                                 renderTable(categoriaSel.value, busqueda.value); 
                             }catch(e){ 
                                 console.error('Entrada error',e); 
@@ -1026,11 +1049,12 @@
                                 
                                 // Safety Check: Fetch latest data before modifying
                                 setLoading(true, 'Verificando stock en servidor...', true);
-                                await loadInventoryForCategory(c);
-                                const freshItem = (inventory[c]||[]).find(x => x.id === item.id || x.codigo === item.codigo);
+                                // Optimized: Fetch single item instead of whole category
+                                const freshItem = await loadItemRemote(c, item.codigo || item.sku);
 
                                 if(!freshItem){
                                     alert('Error: El producto no se encuentra en el servidor (pudo ser eliminado).');
+                                    await loadInventoryForCategory(c);
                                     renderTable(categoriaSel.value, busqueda.value);
                                     return;
                                 }
@@ -1038,13 +1062,22 @@
                                 const currentStock = parseInt(freshItem.cantidad)||0;
                                 if(currentStock < q) {
                                     alert(`Stock insuficiente en el servidor.\nStock actual real: ${currentStock}\nIntentaste retirar: ${q}`);
+                                    // Update local to match server reality
+                                    item.cantidad = currentStock;
+                                    const mainItem = (inventory[c]||[]).find(x => x.codigo === item.codigo);
+                                    if(mainItem) mainItem.cantidad = currentStock;
                                     renderTable(categoriaSel.value, busqueda.value);
                                     return;
                                 }
 
                                 const newQty = currentStock - q; 
                                 await updateQuantityRemote(c, freshItem, newQty); 
+                                
+                                // Update local state manually
                                 item.cantidad = newQty; 
+                                const mainItem = (inventory[c]||[]).find(x => x.codigo === item.codigo);
+                                if(mainItem) mainItem.cantidad = newQty;
+
                                 renderTable(categoriaSel.value, busqueda.value); 
                             }catch(e){ 
                                 console.error('Salida error',e); 
