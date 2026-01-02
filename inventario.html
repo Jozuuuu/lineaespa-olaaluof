@@ -109,13 +109,17 @@
                     <option value="Todos">Todos los campos</option>
                 </select>
             </div>
-            <div style="display:flex;gap:8px;align-items:flex-end;">
-                <button id="btnCameraScan" class="btn btn-outline" style="border-color: #3b82f6; color: #3b82f6;">
-                    📷 Escáner
+            <div style="display:flex;gap:12px;align-items:flex-end;">
+                <button id="btnCameraScan" class="btn-pro btn-pro-accent">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    Escáner
                 </button>
-                <button id="btnAdvancedSearch" class="btn btn-outline">Filtros</button>
-                <button id="btnNew" class="btn btn-primary">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 5v14M5 12h14"/></svg>
+                <button id="btnAdvancedSearch" class="btn-pro btn-pro-outline">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                    Filtros
+                </button>
+                <button id="btnNew" class="btn-pro btn-pro-primary">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                     Nuevo
                 </button>
             </div>
@@ -135,37 +139,45 @@
         </div>
 
         <!-- Camera Scanner Modal -->
-        <div id="cameraScanModal" class="modal hidden" style="max-width: 600px;">
-            <h3>📷 Escáner de Inventario</h3>
-            <div id="reader" style="width: 100%; min-height: 300px; background: #000;"></div>
+        <div id="cameraScanModal" class="modal hidden scanner-modal">
+            <h3 style="border:none; margin-bottom:16px;">📷 Escáner de Inventario</h3>
+            
+            <div id="reader" class="scanner-viewport"></div>
             
             <!-- Zoom Control -->
-            <div id="zoomControls" style="display:none; margin-top: 10px; align-items: center; gap: 10px; padding: 0 10px;">
-                <span style="font-size: 1.2rem;">🔍</span>
-                <input type="range" id="zoomSlider" min="1" max="5" step="0.1" value="1" style="flex:1; height: 30px;">
-                <span id="zoomValue" style="min-width: 40px; text-align: right;">1.0x</span>
+            <div id="zoomControls" style="display:none; margin-top: 12px; align-items: center; gap: 12px; padding: 0 8px;">
+                <span style="font-size: 1.2rem; color:var(--text-light);">🔍</span>
+                <input type="range" id="zoomSlider" min="1" max="5" step="0.1" value="1" style="flex:1; height: 30px; cursor:pointer;">
+                <span id="zoomValue" style="min-width: 40px; text-align: right; font-weight:600; color:var(--text);">1.0x</span>
             </div>
 
-            <div id="scanResult" style="margin-top: 15px; padding: 10px; background: #f0f9ff; border-radius: 4px; display: none;">
+            <div id="scanResult" class="scanner-result-container" style="display: none;">
                 <!-- Product Details Container -->
-                <div id="scanDetails" style="margin-bottom: 15px; font-size: 0.95rem; line-height: 1.5;"></div>
+                <div id="scanDetails" class="scanner-details"></div>
                 
                 <!-- Actions -->
-                <div style="border-top: 1px solid #ddd; padding-top: 10px;">
-                    <div style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
-                        <label style="font-weight:bold;">Cantidad:</label>
-                        <input type="number" id="scanQty" value="1" min="1" style="width: 100px; padding: 8px; font-size: 1.1rem; border: 1px solid #ccc; border-radius: 4px;">
+                <div class="scanner-actions-area">
+                    <div class="scanner-qty-group">
+                        <label style="font-weight:600; color:var(--text-light); font-size:0.85rem;">CANTIDAD:</label>
+                        <input type="number" id="scanQty" value="1" min="1" class="scanner-qty-input">
                     </div>
-                    <div style="display: flex; gap: 10px;">
-                        <button id="btnScanEntry" class="btn btn-primary" style="background-color: #10b981; border-color: #10b981; flex: 1; padding: 12px;">+ Entrada</button>
-                        <button id="btnScanExit" class="btn btn-primary" style="background-color: #ef4444; border-color: #ef4444; flex: 1; padding: 12px;">- Salida</button>
+                    
+                    <div class="scanner-btn-group">
+                        <button id="btnScanEntry" class="btn btn-entry btn-scan-action">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                            Entrada
+                        </button>
+                        <button id="btnScanExit" class="btn btn-exit btn-scan-action">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/></svg>
+                            Salida
+                        </button>
                     </div>
-                    <button id="btnScanClear" class="btn btn-outline" style="width:100%; margin-top:10px; border-color:#9ca3af; color:#4b5563;">Cancelar / Escanear Siguiente</button>
+                    <button id="btnScanClear" class="btn-pro btn-pro-outline w-100 mt-4" style="justify-content:center;">Cancelar / Siguiente</button>
                 </div>
             </div>
 
-            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
-                <button id="btnCloseCamera" class="btn btn-outline">Cerrar</button>
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:24px">
+                <button id="btnCloseCamera" class="btn-pro btn-pro-outline">Cerrar</button>
             </div>
         </div>
 

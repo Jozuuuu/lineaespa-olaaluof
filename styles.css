@@ -647,3 +647,207 @@ tbody tr:hover td {
         margin: 16px 0;
     }
 }
+
+/* Loading Overlay */
+#loadingOverlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(255, 255, 255, 0.9);
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+    transition: all 0.3s ease;
+}
+
+#loadingOverlay.hidden { display: none; }
+
+/* Minimized mode for background sync */
+#loadingOverlay.minimized {
+    top: auto; left: auto;
+    bottom: 24px; right: 24px;
+    width: auto; height: auto;
+    background: white;
+    border-radius: var(--radius);
+    padding: 16px 24px;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border);
+    flex-direction: row;
+    gap: 16px;
+    backdrop-filter: none;
+}
+
+#loadingOverlay.minimized .spinner {
+    width: 20px; height: 20px;
+    border-width: 2px;
+    margin-bottom: 0;
+    border-top-color: var(--accent);
+}
+
+#loadingOverlay.minimized .loading-text {
+    font-size: 0.9rem;
+    margin: 0;
+    color: var(--text);
+    font-weight: 500;
+}
+
+.spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid #e2e8f0;
+    border-top: 4px solid var(--accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 16px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading-text {
+    font-family: inherit;
+    font-size: 1.1rem;
+    color: var(--text);
+    font-weight: 600;
+}
+
+
+/* --- Scanner Modal Improvements --- */
+.scanner-modal {
+    max-width: 600px;
+    width: 95%;
+    padding: 24px;
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.scanner-viewport {
+    width: 100%;
+    min-height: 300px;
+    background: #000;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+}
+
+.scanner-result-container {
+    margin-top: 20px;
+    padding: 16px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    animation: slideDown 0.3s ease-out;
+}
+
+.scanner-details {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: var(--text);
+}
+
+.scanner-actions-area {
+    border-top: 1px solid #e2e8f0;
+    padding-top: 16px;
+    margin-top: 16px;
+}
+
+.scanner-qty-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    background: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.scanner-qty-input {
+    width: 80px;
+    font-size: 1.2rem;
+    font-weight: 600;
+    text-align: center;
+    border: none;
+    background: transparent;
+    color: var(--primary);
+}
+
+.scanner-qty-input:focus {
+    outline: none;
+}
+
+.scanner-btn-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.btn-scan-action {
+    padding: 14px;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: transform 0.1s;
+}
+
+.btn-scan-action:active {
+    transform: scale(0.98);
+}
+
+/* --- Professional Button Styles --- */
+.btn-pro {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid transparent;
+}
+
+.btn-pro-primary {
+    background: var(--primary);
+    color: white;
+    box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.1), 0 2px 4px -1px rgba(15, 23, 42, 0.06);
+}
+
+.btn-pro-primary:hover {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.1), 0 4px 6px -2px rgba(15, 23, 42, 0.05);
+}
+
+.btn-pro-outline {
+    background: white;
+    color: var(--text);
+    border-color: #e2e8f0;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.btn-pro-outline:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: #f8fafc;
+}
+
+.btn-pro-accent {
+    background: white;
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+.btn-pro-accent:hover {
+    background: #eff6ff;
+    box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.1);
+}
+
