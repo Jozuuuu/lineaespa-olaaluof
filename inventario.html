@@ -115,7 +115,7 @@
             </div>
             <div style="display:flex;gap:8px;align-items:flex-end;">
                 <button id="btnCameraScan" class="btn btn-outline" style="border-color: #3b82f6; color: #3b82f6;">
-                    📷 Salida Rápida
+                    📷 Escáner
                 </button>
                 <button id="btnAdvancedSearch" class="btn btn-outline">Filtros</button>
                 <button id="btnNew" class="btn btn-primary">
@@ -140,17 +140,26 @@
 
         <!-- Camera Scanner Modal -->
         <div id="cameraScanModal" class="modal hidden" style="max-width: 600px;">
-            <h3>📷 Salida Rápida por Cámara</h3>
+            <h3>📷 Escáner de Inventario</h3>
             <div id="reader" style="width: 100%; min-height: 300px; background: #000;"></div>
+            
             <div id="scanResult" style="margin-top: 15px; padding: 10px; background: #f0f9ff; border-radius: 4px; display: none;">
-                <h4 id="scanProductName" style="margin: 0 0 5px 0;">Producto</h4>
-                <p id="scanProductCode" style="margin: 0; color: #666; font-size: 0.9rem;">CODE</p>
-                <div style="margin-top: 10px; display: flex; gap: 10px; align-items: center;">
-                    <label>Cantidad a retirar:</label>
-                    <input type="number" id="scanQty" value="1" min="1" style="width: 80px; padding: 5px;">
-                    <button id="btnConfirmScanExit" class="btn btn-primary">Confirmar Salida</button>
+                <!-- Product Details Container -->
+                <div id="scanDetails" style="margin-bottom: 15px; font-size: 0.95rem; line-height: 1.5;"></div>
+                
+                <!-- Actions -->
+                <div style="border-top: 1px solid #ddd; padding-top: 10px;">
+                    <div style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
+                        <label style="font-weight:bold;">Cantidad:</label>
+                        <input type="number" id="scanQty" value="1" min="1" style="width: 100px; padding: 8px; font-size: 1.1rem; border: 1px solid #ccc; border-radius: 4px;">
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button id="btnScanEntry" class="btn btn-primary" style="background-color: #10b981; border-color: #10b981; flex: 1; padding: 12px;">+ Entrada</button>
+                        <button id="btnScanExit" class="btn btn-primary" style="background-color: #ef4444; border-color: #ef4444; flex: 1; padding: 12px;">- Salida</button>
+                    </div>
                 </div>
             </div>
+
             <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
                 <button id="btnCloseCamera" class="btn btn-outline">Cerrar</button>
             </div>
@@ -1230,10 +1239,9 @@
         const cameraScanModal = document.getElementById('cameraScanModal');
         const btnCloseCamera = document.getElementById('btnCloseCamera');
         const scanResult = document.getElementById('scanResult');
-        const scanProductName = document.getElementById('scanProductName');
-        const scanProductCode = document.getElementById('scanProductCode');
-        const scanQty = document.getElementById('scanQty');
-        const btnConfirmScanExit = document.getElementById('btnConfirmScanExit');
+        const btnScanEntry = document.getElementById('btnScanEntry');
+        const btnScanExit = document.getElementById('btnScanExit');
+        const scanDetails = document.getElementById('scanDetails');
         let html5QrcodeScanner = null;
         let currentScannedItem = null;
         let currentScannedCat = null;
@@ -1272,8 +1280,43 @@
                 
                 // Show UI
                 scanResult.style.display = 'block';
-                scanProductName.innerText = currentScannedItem.nombre || 'Producto sin nombre';
-                scanProductCode.innerText = `Código: ${currentScannedItem.codigo} | Stock Actual: ${currentScannedItem.cantidad}`;
+                
+                // Build detailed info HTML
+                let detailsHtml = `
+                    <div style="font-weight: bold; font-size: 1.1rem; margin-bottom: 5px; color: #1e3a8a;">${currentScannedItem.nombre || 'Producto sin nombre'}</div>
+                    <div style="color: #555;"><b>Código:</b> ${currentScannedItem.codigo}</div>
+                    <div style="color: #555;"><b>Categoría:</b> ${currentScannedCat.toUpperCase()}</div>
+                    <div style="color: #555;"><b>Stock Actual:</b> <span style="font-weight:bold; color:${(parseInt(currentScannedItem.cantidad)||0)===0?'red':'green'}">${currentScannedItem.cantidad}</span></div>
+                `;
+                
+                // Add extra fields based on category
+                const extraFields = [];
+                if(currentScannedCat === 'vidrio'){
+                    if(currentScannedItem.tipo) extraFields.push(`Tipo: ${currentScannedItem.tipo}`);
+                    if(currentScannedItem.color) extraFields.push(`Color: ${currentScannedItem.color}`);
+                    if(currentScannedItem.grosor) extraFields.push(`Grosor: ${currentScannedItem.grosor}`);
+                    if(currentScannedItem.medida1) extraFields.push(`Medidas: ${currentScannedItem.medida1} x ${currentScannedItem.medida2}`);
+                } else if(currentScannedCat === 'aluminio'){
+                    if(currentScannedItem.linea) extraFields.push(`Línea: ${currentScannedItem.linea}`);
+                    if(currentScannedItem.serie) extraFields.push(`Serie: ${currentScannedItem.serie}`);
+                    if(currentScannedItem.color) extraFields.push(`Color: ${currentScannedItem.color}`);
+                } else {
+                    if(currentScannedItem.color) extraFields.push(`Color: ${currentScannedItem.color}`);
+                    if(currentScannedItem.tipo) extraFields.push(`Tipo: ${currentScannedItem.tipo}`);
+                }
+                
+                if(extraFields.length > 0){
+                    detailsHtml += `<div style="margin-top:5px; font-size:0.9rem; color:#666;">${extraFields.join(' | ')}</div>`;
+                }
+
+                // Show image if available
+                let imgUrl = currentScannedItem.imageUrl || currentScannedItem.imageData;
+                if(imgUrl){
+                    imgUrl = formatGoogleDriveUrl(imgUrl);
+                    detailsHtml += `<div style="margin-top:10px; text-align:center;"><img src="${imgUrl}" style="max-height:100px; border-radius:4px; box-shadow:0 2px 4px rgba(0,0,0,0.1);"></div>`;
+                }
+
+                scanDetails.innerHTML = detailsHtml;
                 scanQty.value = 1;
                 scanQty.focus();
                 
@@ -1286,7 +1329,7 @@
             }
         }
 
-        btnConfirmScanExit.addEventListener('click', async ()=>{
+        async function handleScanAction(isEntry){
             if(!currentScannedItem || !currentScannedCat) return;
             
             const q = parseInt(scanQty.value) || 0;
@@ -1294,8 +1337,9 @@
             
             const item = currentScannedItem;
             const cat = currentScannedCat;
+            const actionName = isEntry ? 'Entrada' : 'Salida';
             
-            setLoading(true, 'Procesando salida...', true);
+            setLoading(true, `Procesando ${actionName}...`, true);
             try{
                 // 1. Fetch fresh data
                 const freshItem = await loadItemRemote(cat, item.codigo);
@@ -1306,14 +1350,20 @@
                 }
                 
                 const currentStock = parseInt(freshItem.cantidad)||0;
-                if(currentStock < q){
-                    alert(`Stock insuficiente. Stock real: ${currentStock}`);
-                    resetScannerUI();
-                    return;
+                let newQty = 0;
+
+                if(isEntry){
+                    newQty = currentStock + q;
+                } else {
+                    if(currentStock < q){
+                        alert(`Stock insuficiente. Stock real: ${currentStock}`);
+                        resetScannerUI();
+                        return;
+                    }
+                    newQty = currentStock - q;
                 }
                 
                 // 2. Update
-                const newQty = currentStock - q;
                 await updateQuantityRemote(cat, freshItem, newQty);
                 
                 // 3. Update local
@@ -1322,7 +1372,7 @@
                 if(mainItem) mainItem.cantidad = newQty;
                 renderTable(categoriaSel.value, busqueda.value);
                 
-                alert('Salida registrada correctamente.');
+                alert(`${actionName} registrada correctamente. Nuevo stock: ${newQty}`);
                 resetScannerUI();
                 
             }catch(e){
@@ -1332,7 +1382,10 @@
             } finally {
                 setLoading(false);
             }
-        });
+        }
+
+        btnScanEntry.addEventListener('click', ()=> handleScanAction(true));
+        btnScanExit.addEventListener('click', ()=> handleScanAction(false));
 
         function resetScannerUI(){
             scanResult.style.display = 'none';
