@@ -7,46 +7,31 @@
 <link rel="icon" href="img/aluoferta_logo.png">
 <link rel="stylesheet" href="styles.css">
 </head>
-<body>
-<div class="container">
-  <div class="header">
-    <img src="img/aluoferta_logo.png" alt="Aluoferta" class="logo">
-    <div>
-      <div class="title">Catálogo técnico</div>
-      <div class="lead">Documentación y herramientas — Aluoferta</div>
-    </div>
+<body class="centered">
+<div class="container-sm card">
+  <img src="https://aluoferta.com/wp-content/uploads/2021/03/logo-aluoferta.png" alt="Aluoferta" class="logo" onerror="this.src='img/aluoferta_logo.png'">
+  <h1 class="title">Catálogo Técnico</h1>
+  <p class="lead">Herramientas y documentación</p>
+
+  <div class="actions flex-col">
+    <a class="btn btn-primary" href="tecnico.html">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v6h6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 13H8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 17H8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 9H8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      PDF Técnico
+    </a>
+
+    <a class="btn btn-outline" href="descuentos.html">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 1v22" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Calculadora de Descuentos
+    </a>
+
+    <a class="btn btn-outline" href="indexinv.html">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.27 6.96 12 12.01l8.73-5.05" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 22.08V12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Sistema de Inventarios
+    </a>
   </div>
 
-  <div class="card">
-    <h3 class="section-title">Accesos</h3>
-    <p class="muted">Elige una opción:</p>
-
-    <div class="actions">
-      <a class="btn btn-primary" href="tecnico.html" target="_blank" rel="noopener">
-        <svg class="icon-pdf" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 2h7l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" stroke="#fff" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        PDF técnico
-      </a>
-
-      <a class="btn btn-outline" href="descuentos.html">
-        Calculadora de descuentos
-      </a>
-
-      <a class="btn btn-outline" href="indexinv.html">
-        <svg class="icon-inv" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="height:18px;margin-right:6px;vertical-align:middle"><path d="M3 7h18v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" stroke="#000" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 3h-8v4h8V3z" stroke="#000" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Inventarios
-      </a>
-    </div>
-
-    <div class="small-note">
-      El botón "PDF técnico" abre una página nueva con el catálogo; "Calculadora de descuentos" te lleva a descuentos.html.
-      <br>
-      Coloca los PDFs en: <strong>c:\Users\falco\OneDrive\Escritorio\LEO\aluminio\Discounts\docs\</strong>
-      con los nombres: <code>Catalogo_1400.pdf</code>, <code>Catalogo_3500.pdf</code>, <code>Catalogo_4600.pdf</code>.
-    </div>
-  </div>
-
-  <div class="card footer">
-    © Aluoferta — Archivos en: <span style="font-family:monospace">img/aluoferta_logo.png</span> y <span style="font-family:monospace">docs/Catalogo_1400.pdf, docs/Catalogo_3500.pdf, docs/Catalogo_4600.pdf</span>
+  <div class="footer">
+    © 2024 Aluoferta — Uso interno
   </div>
 </div>
 </body>

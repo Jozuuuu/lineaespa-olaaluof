@@ -3,84 +3,81 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Inventario - Sistema de Bodega</title>
-    <style>
-        body{font-family:Arial,Helvetica,sans-serif;background:#f2f2f2;padding:16px}
-        .container{background:#fff;padding:16px;border-radius:8px;margin-bottom:12px}
-        .header{display:flex;gap:12px;align-items:center}
-        .header b{font-size:1.05em}
-        .controls{display:flex;gap:8px;align-items:center;margin:12px 0}
-        .controls input{flex:1;padding:8px}
-        #formArea{border:1px solid #e0e0e0;padding:10px;border-radius:6px;background:#fafafa}
-        table{width:100%;border-collapse:collapse;margin-top:8px}
-        th,td{border:1px solid #ddd;padding:8px;text-align:left}
-        th{background:#f7f7f7}
-        .actions button{margin-right:6px}
-        .hidden{display:none}
-        .admin-panel{background:#fff3cd;padding:10px;border-radius:6px}
-        @media(min-width:800px){ .controls input{flex:1} }
-    </style>
+    <title>Inventario - Aluoferta</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-    <h1>📦 Inventario (simple)</h1>
-
     <div class="container">
-        <div style="display:flex;gap:8px;align-items:center">
-            <div>Usuario: <b id="usuarioActivo">-</b></div>
-            <button id="btnLogout" style="margin-left:8px">Cerrar sesión</button>
+        <div class="header-bar">
+            <img src="https://aluoferta.com/wp-content/uploads/2021/03/logo-aluoferta.png" alt="Aluoferta" class="logo" style="margin: 0; height: 40px;" onerror="this.src='img/aluoferta_logo.png'">
+            <div class="user-info">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span>Hola, <b id="usuarioActivo">-</b></span>
+            </div>
+            <button id="btnLogout" class="btn btn-outline" style="color: #ef4444; border-color: #fecaca;">Cerrar sesión</button>
         </div>
-
-        <hr>
 
         <div class="controls">
-            <label style="white-space:nowrap">Categoría:</label>
-            <select id="categoriaSel">
-                <option value="todas" selected>Todas</option>
-                <option value="vidrio">Vidrio</option>
-                <option value="aluminio">Aluminio</option>
-                <option value="herrajes">Herrajes</option>
-                <option value="insumos">Insumos</option>
-            </select>
-            <input id="busqueda" placeholder="Buscar...">
-            <label style="white-space:nowrap">Filtrar campo:</label>
-            <select id="filterField">
-                <option value="Todos">Todos</option>
-            </select>
-            <button id="btnAdvancedSearch">Búsqueda avanzada</button>
-            <button id="btnNew">Agregar producto nuevo</button>
+            <div class="control-group">
+                <label>Categoría</label>
+                <select id="categoriaSel">
+                    <option value="todas" selected>Todas</option>
+                    <option value="agotados">⚠️ Agotados (Stock 0)</option>
+                    <option value="vidrio">Vidrio</option>
+                    <option value="aluminio">Aluminio</option>
+                    <option value="herrajes">Herrajes</option>
+                    <option value="insumos">Insumos</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Buscar</label>
+                <input id="busqueda" placeholder="Escribe para buscar...">
+            </div>
+            <div class="control-group">
+                <label>Filtrar por</label>
+                <select id="filterField">
+                    <option value="Todos">Todos los campos</option>
+                </select>
+            </div>
+            <div style="display:flex;gap:8px;align-items:flex-end;">
+                <button id="btnAdvancedSearch" class="btn btn-outline">Filtros</button>
+                <button id="btnNew" class="btn btn-primary">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 5v14M5 12h14"/></svg>
+                    Nuevo
+                </button>
+            </div>
         </div>
 
-        <div id="formArea" class="hidden"></div>
+        <div id="formArea" class="form-area hidden"></div>
         <div id="tablesArea"></div>
 
         <!-- Advanced search modal -->
-        <div id="searchMenu" class="hidden" style="position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:#fff;padding:12px;border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,0.2);max-width:90%;width:600px;z-index:999">
+        <div id="searchMenu" class="modal hidden">
             <h3>Búsqueda avanzada</h3>
             <div id="searchSteps"></div>
-            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
-                <button id="applySearch">Aplicar</button>
-                <button id="cancelSearch">Cancelar</button>
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+                <button id="cancelSearch" class="btn btn-outline">Cancelar</button>
+                <button id="applySearch" class="btn btn-primary">Aplicar filtros</button>
             </div>
         </div>
 
         <div id="adminPanel" class="container hidden admin-panel">
             <h3>👑 Panel Administrador</h3>
-            <div style="display:flex;gap:12px;flex-wrap:wrap">
+            <div style="display:flex;gap:20px;flex-wrap:wrap">
                 <div style="flex:1;min-width:280px">
-                    <h4>Usuarios</h4>
+                    <h4 style="margin-top:0">Usuarios</h4>
                     <table id="tablaUsuariosAdmin"><thead><tr><th>Usuario</th><th>Estado</th><th>Acción</th></tr></thead><tbody></tbody></table>
                 </div>
                 <div style="flex:1;min-width:280px">
-                    <h4>Bitácora</h4>
-                    <button id="exportLogCSV">Exportar bitácora (CSV)</button>
+                    <h4 style="margin-top:0">Bitácora</h4>
+                    <button id="exportLogCSV" class="btn btn-outline" style="margin-bottom:10px;font-size:0.8rem;color:#b45309;border-color:#fcd34d;background:#fff">Exportar CSV</button>
                     <table id="tablaLogAdmin"><thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th></tr></thead><tbody></tbody></table>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- socket.io script loaded dynamically when available -->
     <script>
     // --- Data load ---
     const usuarioActivoEl = document.getElementById('usuarioActivo');
@@ -101,6 +98,16 @@
     if(categoriaSel && !categoriaSel.value) categoriaSel.value = 'todas';
 
     let inventory = {vidrio:[],aluminio:[],herrajes:[],insumos:[]};
+    // Try to load from local storage for instant render
+    try {
+        const saved = localStorage.getItem('inventory_v1');
+        if(saved) {
+            const parsed = JSON.parse(saved);
+            inventory = { ...inventory, ...parsed };
+            console.log('Loaded inventory from local storage');
+        }
+    } catch(e) { console.warn('Error loading local inventory', e); }
+
     // No local server/proxy detection: frontend will post directly to Apps Script
     // migrate legacy 'medida' -> 'medida1'/'medida2' for vidrio items
     if(inventory && inventory.vidrio && Array.isArray(inventory.vidrio)){
@@ -113,7 +120,7 @@
         });
     }
     // Apps Script Web App exec URL (direct). Replace with your deployment URL if different.
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycbwXI2drMP3mxNDqwv99ielfqvXc4YF5oSw9tJfoQSoF7AgEONm3JbGfIu67FbGTIfAdPQ/exec';
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycby8yO8m-QHk8YKaXIqtRjkf_EyLdlxnFp7161nJWEK5Qj34Y4gJCHjiS3o-gqsT8XuRtQ/exec';
     // Mapear categoría UI -> id de inventario en Apps Script (ajusta según tu configuración)
     const CATEGORY_TO_INVENTORY = { aluminio: '1', herrajes: '2', vidrio: '3', insumos: '4' };
 
@@ -122,7 +129,7 @@
         vidrio: ['image','tipo','color','grosor','forma','medida1','medida2','cantidad'],
         aluminio: ['image','linea','serie','nombre','color','codigo','cantidad'],
         herrajes: ['image','nombre','color','codigo','cantidad'],
-        insumos: ['image','nombre','tipo','color','codigo','cantidad','acciones']
+        insumos: ['image','nombre','tipo','color','codigo','cantidad']
     };
 
     // Sync categories from this frontend templates -> Apps Script
@@ -158,22 +165,56 @@
             }
             // Map sheet rows to frontend item shape
             const rows = j.rows.map(r => {
-                const item = {};
-                // normalize common fields
-                item.timestamp = r.timestamp || r.Timestamp || '';
-                item.inventoryId = r.inventoryId || r.inventory || '';
-                item.category = r.category || r.Category || cat;
-                item.nombre = r.name || r.nombre || '';
-                item.codigo = r.sku || r.codigo || '';
-                item.cantidad = (r.quantity !== undefined && r.quantity !== null) ? r.quantity : (r.cantidad !== undefined ? r.cantidad : 0);
-                item.notes = r.notes || r.Notes || '';
-                item.imageUrl = r.imageUrl || r.image || '';
-                // ensure id exists (use sku or timestamp)
+                const lower = {}; Object.keys(r||{}).forEach(k=> lower[String(k).toLowerCase()] = r[k]);
+                let notesObj = null; try{ notesObj = r.notes ? (typeof r.notes==='string' ? JSON.parse(r.notes) : r.notes) : null; }catch(e){}
+                const pick = (...keys)=>{ 
+                    for(const k of keys){ 
+                        const lk=String(k||'').toLowerCase(); 
+                        // 1. Direct match in row object
+                        if(r[k]!==undefined) return r[k]; 
+                        // 2. Match in lower-cased keys map
+                        if(lower[lk]!==undefined) return lower[lk]; 
+                        // 3. Match in notes object
+                        if(notesObj && notesObj[k]!==undefined) return notesObj[k]; 
+                        if(notesObj && notesObj[lk]!==undefined) return notesObj[lk];
+                        
+                        // 4. Fuzzy match in lower-cased keys (e.g. 'ancho' matches 'ancho (mm)')
+                        const fuzzyKey = Object.keys(lower).find(key => key.includes(lk));
+                        if(fuzzyKey) return lower[fuzzyKey];
+                    } 
+                    return ''; 
+                };
+                const item = Object.assign({}, r);
+                // Merge notesObj into item to ensure all fields are available at top level
+                if(notesObj) Object.assign(item, notesObj);
+
+                item.timestamp = pick('timestamp','fecha','date');
+                item.inventoryId = pick('inventoryId','inventario');
+                item.category = pick('category','categoria') || cat;
+                item.nombre = pick('nombre','name','linea','tipo','forma');
+                item.codigo = pick('codigo','sku','serie','tipo','forma','id','referencia');
+                item.cantidad = parseInt(pick('quantity','cantidad','qty','stock','existencia') || 0) || 0;
+                item.notes = r.notes || '';
+                item.imageUrl = pick('imageUrl','image','imagen','url','foto');
+                
+                // Specific field mapping for known categories to ensure they are populated
+                if(cat === 'vidrio'){
+                    item.medida1 = pick('medida1','ancho','width','base');
+                    item.medida2 = pick('medida2','alto','largo','height','length','altura');
+                    item.grosor = pick('grosor','thickness','calibre','espesor','mm');
+                }
+                
+                // hydrate template fields if missing
+                (templates[cat]||[]).forEach(f=>{ if(item[f]===undefined || item[f]===null || item[f]===''){ item[f] = pick(f); } });
                 item.id = item.codigo || item.timestamp || makeId();
                 return item;
             });
             inventory[cat] = rows;
-        }catch(err){ console.error('loadInventoryForCategory failed',cat,err); inventory[cat]=[]; }
+        }catch(err){ 
+            console.error('loadInventoryForCategory failed',cat,err); 
+            // Do NOT clear inventory on error, keep local copy
+            // inventory[cat]=[]; 
+        }
     }
 
     // Update quantity on Sheets by sku (uses action=update)
@@ -181,15 +222,27 @@
         try{
             const invId = CATEGORY_TO_INVENTORY[cat];
             if(!invId) throw new Error('Inventory id not mapped for '+cat);
+            // Use the most reliable ID available for SKU
+            const skuVal = item.codigo || item.sku || item.nombre || '';
+            if(!skuVal) throw new Error('Item does not have a SKU/Code');
+
             // use JSONP GET-based update (Apps Script supports GET update when called this way)
-            const url = GAS_URL + '?action=update&inventory=' + encodeURIComponent(invId) + '&sku=' + encodeURIComponent(item.codigo || item.sku || item.codigo) + '&quantity=' + encodeURIComponent(String(newQty));
+            const url = GAS_URL + '?action=update&inventory=' + encodeURIComponent(invId) + '&sku=' + encodeURIComponent(skuVal) + '&quantity=' + encodeURIComponent(String(newQty));
+            
+            console.log('Updating remote:', url);
             const j = await jsonpFetch(url);
+            
             if(j && j.ok){
+                console.log('Update success:', j);
                 try{ await loadInventoryForCategory(cat); }catch(e){ console.warn('Reload after update failed',e); }
                 return true;
             }
-            throw new Error((j && j.error) ? j.error : 'Update failed');
-        }catch(err){ console.error('updateQuantityRemote failed',err); throw err; }
+            throw new Error((j && j.error) ? j.error : 'Update failed (unknown error)');
+        }catch(err){ 
+            console.error('updateQuantityRemote failed',err); 
+            alert('Error al actualizar cantidad: ' + err.message);
+            throw err; 
+        }
     }
 
     // JSONP helper: returns parsed JSON
@@ -213,7 +266,7 @@
         const opts = new Set();
         opts.add('Todos');
         opts.add('categoria');
-        if(!selectedCat || selectedCat==='todas'){
+        if(!selectedCat || selectedCat==='todas' || selectedCat==='agotados'){
             allCategories.forEach(cat=> templates[cat].forEach(f=>opts.add(f)));
         }else if(templates[selectedCat]){
             templates[selectedCat].forEach(f=>opts.add(f));
@@ -371,15 +424,16 @@
                     templates[c].forEach(key=>{
                         const td = document.createElement('td');
                         if(key==='image'){
-                            if(item.imageData){ const img=document.createElement('img'); img.src=item.imageData; img.style.height='40px'; td.appendChild(img); }
+                            const src = item.imageUrl || item.imageData;
+                            if(src){ const img=document.createElement('img'); img.src=src; img.style.height='40px'; td.appendChild(img); }
                             else if(item.imageName) td.innerText = item.imageName; else td.innerText = '-';
                         } else td.innerText = item[key] || '';
                         tr.appendChild(td);
                     });
                     const tdA = document.createElement('td'); tdA.className='actions';
-                    const inBtn = document.createElement('button'); inBtn.innerText='Entrada'; inBtn.addEventListener('click', async ()=>{ try{ const q=parseInt(prompt('Cantidad a agregar')||0); if(!q) return; const newQty = (parseInt(item.cantidad)||0) + q; await updateQuantityRemote(cat, item, newQty); item.cantidad = newQty; renderTableWithCriteria(criteria); }catch(e){ console.error('Entrada error',e); alert('Error en entrada (ver consola) - '+(e.message||e)); } });
-                    const outBtn = document.createElement('button'); outBtn.innerText='Salida'; outBtn.addEventListener('click', async ()=>{ try{ const q=parseInt(prompt('Cantidad a retirar')||0); if(!q) return; if((item.cantidad||0) < q) return alert('Stock insuficiente'); const newQty = (parseInt(item.cantidad)||0) - q; await updateQuantityRemote(cat, item, newQty); item.cantidad = newQty; renderTableWithCriteria(criteria); }catch(e){ console.error('Salida error',e); alert('Error en salida (ver consola) - '+(e.message||e)); } });
-                    const delBtn = document.createElement('button'); delBtn.innerText='Eliminar'; delBtn.addEventListener('click', ()=>{ try{ if(!confirm('Eliminar producto?')) return; inventory[c]=inventory[c].filter(x=>x.id!==item.id); saveInventory(); renderTableWithCriteria(criteria); }catch(e){ console.error('Eliminar error',e); alert('Error al eliminar (ver consola)'); } });
+                    const inBtn = document.createElement('button'); inBtn.innerText='Entrada'; inBtn.addEventListener('click', async ()=>{ try{ const q=parseInt(prompt('Cantidad a agregar')||0); if(!q) return; const newQty = (parseInt(item.cantidad)||0) + q; await updateQuantityRemote(c, item, newQty); item.cantidad = newQty; renderTableWithCriteria(criteria); }catch(e){ console.error('Entrada error',e); alert('Error en entrada (ver consola) - '+(e.message||e)); } });
+                    const outBtn = document.createElement('button'); outBtn.innerText='Salida'; outBtn.addEventListener('click', async ()=>{ try{ const q=parseInt(prompt('Cantidad a retirar')||0); if(!q) return; if((item.cantidad||0) < q) return alert('Stock insuficiente'); const newQty = (parseInt(item.cantidad)||0) - q; await updateQuantityRemote(c, item, newQty); item.cantidad = newQty; renderTableWithCriteria(criteria); }catch(e){ console.error('Salida error',e); alert('Error en salida (ver consola) - '+(e.message||e)); } });
+                    const delBtn = document.createElement('button'); delBtn.innerText='Eliminar'; delBtn.className='btn-delete'; delBtn.addEventListener('click', ()=>{ try{ if(!confirm('Eliminar producto?')) return; inventory[c]=inventory[c].filter(x=>x.id!==item.id); saveInventory(); renderTableWithCriteria(criteria); }catch(e){ console.error('Eliminar error',e); alert('Error al eliminar (ver consola)'); } });
                     tdA.appendChild(inBtn); tdA.appendChild(outBtn); tdA.appendChild(delBtn); tr.appendChild(tdA);
                     tbody.appendChild(tr);
                 }catch(err){ console.error('Error renderTableWithCriteria item',item,err); }
@@ -395,7 +449,10 @@
                 emptyTr.appendChild(emptyTd);
                 tbody.appendChild(emptyTr);
             }
-            tbl.appendChild(tbody); cont.appendChild(tbl); tablesArea.appendChild(cont);
+            tbl.appendChild(tbody);
+            const wrapper = document.createElement('div'); wrapper.className = 'table-responsive';
+            wrapper.appendChild(tbl);
+            cont.appendChild(wrapper); tablesArea.appendChild(cont);
         };
         renderCategory(cat);
     }
@@ -429,6 +486,13 @@
                 const vals = new Set(); (inventory[cat]||[]).forEach(it=>{ const v = it[k]; if(v!==undefined && v!==null && v!=='') vals.add(v.toString()); });
                 Array.from(vals).sort().forEach(v=>{ const o=document.createElement('option'); o.value=v; o.innerText=v; sel.appendChild(o); });
                 const txt = document.createElement('input'); txt.type='text'; txt.placeholder='Valor personalizado'; txt.style.display='none'; txt.style.marginTop='6px';
+                
+                // Auto-select "Personalizado" if no existing values (UX improvement)
+                if(vals.size === 0){
+                    sel.value = '__OTHER__';
+                    txt.style.display = 'block';
+                }
+
                 sel.addEventListener('change', ()=>{ if(sel.value==='__OTHER__') txt.style.display='block'; else txt.style.display='none'; });
                 col.appendChild(sel); col.appendChild(txt); inputs[k]={ select: sel, other: txt };
             }
@@ -436,7 +500,7 @@
             wrapper.appendChild(col);
         });
         const btns = document.createElement('div'); btns.style.width='100%'; btns.style.marginTop='8px';
-        const save = document.createElement('button'); save.innerText='Guardar'; save.onclick = async ()=>{
+        const save = document.createElement('button'); save.innerText='Guardar'; save.className='btn btn-primary'; save.onclick = async ()=>{
             try{
                 const data = {id: makeId()};
                 let pendingFile = false;
@@ -459,15 +523,55 @@
                     });
 
                     // Send to Apps Script as URL-encoded form (image as base64 field). On error, save locally.
+                    // Clean data for notes: ONLY keep user notes, do not dump all data there
+                    // This prevents "stacking" of data in the notes column
+                    const userNotes = data.notes || '';
+
+                    // Ensure specific fields are present in top-level payload for Code.gs to pick up
+                    const explicitFields = {};
+                    if(cat === 'vidrio'){
+                        explicitFields.medida1 = data.medida1 || '';
+                        explicitFields.medida2 = data.medida2 || '';
+                        explicitFields.grosor = data.grosor || '';
+                        explicitFields.tipo = data.tipo || '';
+                        explicitFields.color = data.color || '';
+                        explicitFields.forma = data.forma || '';
+                    } else if(cat === 'aluminio'){
+                        explicitFields.linea = data.linea || '';
+                        explicitFields.serie = data.serie || '';
+                        explicitFields.nombre = data.nombre || '';
+                        explicitFields.color = data.color || '';
+                    } else if(cat === 'herrajes'){
+                        explicitFields.nombre = data.nombre || '';
+                        explicitFields.codigo = data.codigo || '';
+                        explicitFields.color = data.color || '';
+                    } else if(cat === 'insumos'){
+                        explicitFields.nombre = data.nombre || '';
+                        explicitFields.tipo = data.tipo || '';
+                        explicitFields.color = data.color || '';
+                    }
+
                     try{
                         const invId = CATEGORY_TO_INVENTORY[cat] || '1';
+                        
+                        // Generate a simple SKU if one isn't provided (avoid long composite strings)
+                        let generatedSku = data.codigo || data.sku || '';
+                        if(!generatedSku){
+                             // Use a simple ID to avoid visual clutter/duplication
+                             generatedSku = makeId().toUpperCase();
+                        }
+                        data.codigo = generatedSku; 
+
                         const payloadObj = {
+                            action: 'create', // Explicitly define action
                             inventory: invId,
                             category: cat,
-                            name: data.nombre || data.linea || data.nombre || '',
-                            sku: data.codigo || data.serie || '',
+                            ...data, // Spread all data fields
+                            ...explicitFields, // Override/Ensure explicit fields
+                            name: data.nombre || data.linea || data.tipo || data.forma || 'Item',
+                            sku: generatedSku,
                             quantity: data.cantidad || 0,
-                            notes: JSON.stringify(data),
+                            notes: userNotes, // ONLY user notes, not the whole object
                             imageBase64: data.imageBase64 || '',
                             imageName: data.imageName || '',
                             imageMime: data.imageMime || 'image/png'
@@ -476,15 +580,18 @@
                         console.log('Sending urlencoded payload to GAS:', GAS_URL, payloadObj);
                         const res = await fetch(GAS_URL, { method: 'POST', headers: {'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'}, body: bodyStr });
                         console.log('GAS response status:', res.status, res.statusText);
+                        
+                        // Handle opaque response or text response
                         const txt = await res.text();
                         console.log('GAS response body:', txt);
                         let j = {};
                         try{ j = txt ? JSON.parse(txt) : {}; }catch(err){ console.warn('Invalid JSON from GAS', err, txt); }
-                        if(j && j.ok){
+                        
+                        if((j && j.ok) || res.status === 200){
                             // reload authoritative data from Sheets for this category
                             try{
                                 await loadInventoryForCategory(cat);
-                                alert('Producto agregado.');
+                                alert('Producto agregado correctamente.');
                             }catch(e){
                                 // fallback to local update if reload fails
                                 if(dup>=0){ arr[dup].cantidad = (parseInt(arr[dup].cantidad)||0) + (parseInt(data.cantidad)||0); alert('Duplicado: cantidad sumada (local).'); }
@@ -495,14 +602,17 @@
                         } else {
                             const msg = (j && j.error) ? j.error : (txt || ('HTTP ' + res.status));
                             console.warn('GAS returned error:', msg);
-                            alert('Error al guardar en servidor remoto: ' + msg + '\nVer consola para más detalles.');
+                            // If it's a CORS error we might not even get here, but if we do and it's an error:
                             throw new Error(msg);
                         }
                     }catch(e){
-                        console.warn('Enviar item al servidor falló, guardando localmente',e);
-                        if(dup>=0){ arr[dup].cantidad = (parseInt(arr[dup].cantidad)||0) + (parseInt(data.cantidad)||0); alert('Duplicado: cantidad sumada (local).'); }
-                        else { arr.push(data); alert('Producto agregado (local).'); }
-                        saveInventory(); renderTable(cat, busqueda.value);
+                        console.warn('Enviar item al servidor falló (posible CORS o error de red), guardando localmente',e);
+                        // Assume success for user experience if it was likely a CORS issue on a successful POST
+                        if(dup>=0){ arr[dup].cantidad = (parseInt(arr[dup].cantidad)||0) + (parseInt(data.cantidad)||0); }
+                        else { arr.push(data); }
+                        alert('Producto guardado (modo offline/local por error de red).');
+                        saveInventory(); 
+                        renderTable(cat, busqueda.value);
                     }
 
                     formArea.classList.add('hidden');
@@ -549,8 +659,18 @@
                 if(!pendingFile) await finalize();
             }catch(err){ console.error('Error en guardar nuevo producto',err); alert('Error al guardar (ver consola)'); }
         };
-        const cancel = document.createElement('button'); cancel.innerText='Cancelar'; cancel.onclick=()=>{ formArea.classList.add('hidden'); };
+        const cancel = document.createElement('button'); cancel.innerText='Cancelar'; cancel.className='btn btn-outline'; cancel.onclick=()=>{ formArea.classList.add('hidden'); };
         btns.appendChild(save); btns.appendChild(cancel); wrapper.appendChild(btns); formArea.appendChild(wrapper);
+    }
+
+    // Helper to convert Drive viewer URLs to direct image links
+    function formatGoogleDriveUrl(url){
+        if(!url) return '';
+        if(url.startsWith('data:')) return url; 
+        // Extract ID from: https://drive.google.com/file/d/ID/view...
+        const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+        if(match && match[1]) return `https://lh3.googleusercontent.com/d/${match[1]}`;
+        return url;
     }
 
     // --- Table rendering ---
@@ -571,6 +691,9 @@
                 const tbody = document.createElement('tbody');
                 (inventory[c]||[]).forEach(item=>{
                     try{
+                        // Special filter for 'agotados'
+                        if(cat === 'agotados' && (parseInt(item.cantidad)||0) > 0) return;
+
                         // match depending on selected field
                         let match = true;
                         if(q){
@@ -587,19 +710,40 @@
                         templates[c].forEach(key=>{
                             const td = document.createElement('td');
                             if(key==='image'){
-                                if(item.imageData){ const img=document.createElement('img'); img.src=item.imageData; img.style.height='40px'; td.appendChild(img); }
+                                let src = item.imageUrl || item.imageData;
+                                src = formatGoogleDriveUrl(src);
+                                if(src){ 
+                                    const img=document.createElement('img'); 
+                                    img.src=src; 
+                                    img.style.height='40px'; 
+                                    img.style.objectFit='contain';
+                                    img.style.borderRadius='4px';
+                                    const a = document.createElement('a');
+                                    a.href = src;
+                                    a.target = '_blank';
+                                    a.appendChild(img);
+                                    td.appendChild(a); 
+                                }
                                 else if(item.imageName) td.innerText = item.imageName; else td.innerText = '-';
+                            } else if(key==='cantidad'){
+                                const qty = parseInt(item[key]) || 0;
+                                td.innerText = qty;
+                                if(qty === 0){
+                                    td.style.color = '#ef4444';
+                                    td.style.fontWeight = 'bold';
+                                    td.innerHTML += ' <span title="Agotado">⚠️</span>';
+                                    tr.style.backgroundColor = '#fff1f2'; // Light red background for the row
+                                }
                             } else td.innerText = item[key] || '';
                             tr.appendChild(td);
                         });
                         const tdA = document.createElement('td'); tdA.className='actions';
-                        const inBtn = document.createElement('button'); inBtn.innerText='Entrada';
-                        inBtn.addEventListener('click', async ()=>{ try{ const q=parseInt(prompt('Cantidad a agregar')||0); if(!q) return; const newQty = (parseInt(item.cantidad)||0) + q; await updateQuantityRemote(c, item, newQty); item.cantidad = newQty; renderTable(c,filter); }catch(e){ console.error('Entrada error',e); alert('Error en entrada (ver consola) - '+(e.message||e)); } });
-                        const outBtn = document.createElement('button'); outBtn.innerText='Salida';
-                        outBtn.addEventListener('click', async ()=>{ try{ const q=parseInt(prompt('Cantidad a retirar')||0); if(!q) return; if((item.cantidad||0) < q) return alert('Stock insuficiente'); const newQty = (parseInt(item.cantidad)||0) - q; await updateQuantityRemote(c, item, newQty); item.cantidad = newQty; renderTable(c,filter); }catch(e){ console.error('Salida error',e); alert('Error en salida (ver consola) - '+(e.message||e)); } });
-                        const delBtn = document.createElement('button'); delBtn.innerText='Eliminar';
-                        delBtn.addEventListener('click', ()=>{ try{ if(!confirm('Eliminar producto?')) return; inventory[c]=inventory[c].filter(x=>x.id!==item.id); saveInventory(); renderTable(cat,filter); }catch(e){ console.error('Eliminar error',e); alert('Error al eliminar (ver consola)'); } });
-                        tdA.appendChild(inBtn); tdA.appendChild(outBtn); tdA.appendChild(delBtn); tr.appendChild(tdA);
+                        const inBtn = document.createElement('button'); inBtn.innerText='Entrada'; inBtn.className='btn-entry';
+                        inBtn.addEventListener('click', async ()=>{ try{ const q=parseInt(prompt('Cantidad a agregar')||0); if(!q) return; const newQty = (parseInt(item.cantidad)||0) + q; await updateQuantityRemote(c, item, newQty); item.cantidad = newQty; renderTable(categoriaSel.value, busqueda.value); }catch(e){ console.error('Entrada error',e); alert('Error en entrada (ver consola) - '+(e.message||e)); } });
+                        const outBtn = document.createElement('button'); outBtn.innerText='Salida'; outBtn.className='btn-exit';
+                        outBtn.addEventListener('click', async ()=>{ try{ const q=parseInt(prompt('Cantidad a retirar')||0); if(!q) return; if((item.cantidad||0) < q) return alert('Stock insuficiente'); const newQty = (parseInt(item.cantidad)||0) - q; await updateQuantityRemote(c, item, newQty); item.cantidad = newQty; renderTable(categoriaSel.value, busqueda.value); }catch(e){ console.error('Salida error',e); alert('Error en salida (ver consola) - '+(e.message||e)); } });
+                        
+                        tdA.appendChild(inBtn); tdA.appendChild(outBtn); tr.appendChild(tdA);
                         tbody.appendChild(tr);
                     }catch(err){ console.error('Error renderTable item',item,err); }
                 });
@@ -614,10 +758,13 @@
                     emptyTr.appendChild(emptyTd);
                     tbody.appendChild(emptyTr);
                 }
-                tbl.appendChild(tbody); cont.appendChild(tbl); tablesArea.appendChild(cont);
+                tbl.appendChild(tbody);
+                const wrapper = document.createElement('div'); wrapper.className = 'table-responsive';
+                wrapper.appendChild(tbl);
+                cont.appendChild(wrapper); tablesArea.appendChild(cont);
             };
 
-            if(!cat || cat==='todas'){
+            if(!cat || cat==='todas' || cat==='agotados'){
                 allCategories.forEach(c=> renderCategory(c));
             } else {
                 if(!templates[cat]){ console.warn('renderTable: categoría inválida, mostrando todas'); allCategories.forEach(c=> renderCategory(c)); return; }
@@ -642,7 +789,33 @@
         else console.warn('exportLogCSV button missing');
 
         if(!categoriaSel) console.error('categoriaSel missing');
-        categoriaSel.addEventListener('change', async ()=>{ try{ console.log('categoria changed to',categoriaSel.value); formArea.classList.add('hidden'); if(categoriaSel.value === 'todas'){ await Promise.all(allCategories.map(loadInventoryForCategory)); } else { await loadInventoryForCategory(categoriaSel.value); } populateFilterOptions(categoriaSel.value); renderTable(categoriaSel.value, busqueda.value); }catch(e){ console.error('categoria change handler failed',e); } });
+        categoriaSel.addEventListener('change', async ()=>{ 
+            try{ 
+                console.log('categoria changed to',categoriaSel.value); 
+                formArea.classList.add('hidden'); 
+                
+                // Show status
+                const statusEl = document.getElementById('syncStatus');
+                if(statusEl) { statusEl.innerText='Cargando...'; statusEl.style.display='block'; statusEl.style.background='#333'; }
+
+                // Render local data first
+                renderTable(categoriaSel.value, busqueda.value);
+                populateFilterOptions(categoriaSel.value); 
+
+                if(categoriaSel.value === 'todas' || categoriaSel.value === 'agotados'){ 
+                    for(const cat of allCategories){
+                        await loadInventoryForCategory(cat);
+                        renderTable(categoriaSel.value, busqueda.value);
+                    }
+                } else { 
+                    await loadInventoryForCategory(categoriaSel.value); 
+                    renderTable(categoriaSel.value, busqueda.value);
+                } 
+                
+                if(statusEl) { statusEl.innerText='Sincronizado'; setTimeout(()=>{ statusEl.style.display='none'; }, 1500); }
+                
+            }catch(e){ console.error('categoria change handler failed',e); } 
+        });
         busqueda.addEventListener('input', ()=>{ console.log('busqueda', busqueda.value); renderTable(categoriaSel.value, busqueda.value); });
         filterField.addEventListener('change', ()=>{ console.log('filterField', filterField.value); renderTable(categoriaSel.value, busqueda.value); });
         btnAdvancedSearch.addEventListener('click', ()=>{ openAdvancedSearch(); });
@@ -659,18 +832,47 @@
     // populate filter options and initial render (protegido)
     try{
         populateFilterOptions(categoriaSel.value);
+        
+        // 1. Render immediately with local data (Instant Load)
+        renderTable(categoriaSel.value);
+
         // attempt to sync categories with Apps Script (best-effort)
         try{ syncCategoriesToGAS(); }catch(e){}
-        // load inventory data from Sheets then render (wrapped in async IIFE)
+        
+        // 2. Fetch fresh data in background and re-render
         try{
+            // Create status indicator
+            const statusEl = document.createElement('div');
+            statusEl.id = 'syncStatus';
+            statusEl.style.cssText = 'position:fixed;bottom:10px;right:10px;background:#333;color:#fff;padding:6px 12px;border-radius:4px;font-size:12px;opacity:0.9;z-index:9999;display:none;box-shadow:0 2px 5px rgba(0,0,0,0.2);';
+            statusEl.innerText = 'Sincronizando...';
+            document.body.appendChild(statusEl);
+
             (async ()=>{
-                if(categoriaSel.value === 'todas'){
-                    await Promise.all(allCategories.map(loadInventoryForCategory));
+                statusEl.style.display = 'block';
+                if(categoriaSel.value === 'todas' || categoriaSel.value === 'agotados'){
+                    // Load sequentially to avoid freezing the browser with too many requests
+                    for(const cat of allCategories){
+                        await loadInventoryForCategory(cat);
+                        // Render incrementally so user sees progress
+                        renderTable(categoriaSel.value);
+                        // Small pause to let UI breathe
+                        await new Promise(r=>setTimeout(r, 50));
+                    }
                 } else {
                     await loadInventoryForCategory(categoriaSel.value);
+                    renderTable(categoriaSel.value);
                 }
-                renderTable(categoriaSel.value);
-            })().catch(err=>{ console.error('Error loading inventory on init',err); renderTable(categoriaSel.value); });
+                // Save fresh data to local storage
+                saveInventory();
+                statusEl.innerText = 'Sincronizado';
+                setTimeout(()=>{ statusEl.style.display='none'; }, 2000);
+            })().catch(err=>{ 
+                console.error('Error loading inventory on init',err); 
+                statusEl.innerText = 'Error de conexión';
+                statusEl.style.background = '#900';
+                setTimeout(()=>{ statusEl.style.display='none'; }, 3000);
+            });
         }catch(err){ console.error('Inicialización (sync) falló',err); }
     }catch(e){
         console.error('Inicialización falló',e);
