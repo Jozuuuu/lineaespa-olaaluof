@@ -150,6 +150,16 @@
                 <span id="zoomValue" style="min-width: 40px; text-align: right; font-weight:600; color:var(--text);">1.0x</span>
             </div>
 
+            <!-- File Scan Option (Fallback for difficult items) -->
+            <div style="margin-top:12px; text-align:center;">
+                <button id="btnScanFile" class="btn-pro btn-pro-outline" style="font-size:0.9rem; width:100%; justify-content:center;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    Subir Foto / Usar Cámara Nativa
+                </button>
+                <input type="file" id="fileScanInput" accept="image/*" style="display:none">
+                <p style="font-size:0.75rem; color:#94a3b8; margin-top:6px;">Úsalo para objetos cilíndricos o con mucho reflejo</p>
+            </div>
+
             <div id="scanResult" class="scanner-result-container" style="display: none;">
                 <!-- Product Details Container -->
                 <div id="scanDetails" class="scanner-details"></div>
@@ -1581,11 +1591,54 @@
 
         function stopScanner(){
             if(html5QrcodeScanner){
-                html5QrcodeScanner.stop().then(() => {
-                    html5QrcodeScanner.clear();
+                // Check if it's running (isScanning is not always reliable in all versions, but state is)
+                try {
+                    if(html5QrcodeScanner.getState() === 2 || html5QrcodeScanner.getState() === 3) { // SCANNING or PAUSED
+                        html5QrcodeScanner.stop().then(() => {
+                            html5QrcodeScanner.clear();
+                            html5QrcodeScanner = null;
+                        }).catch(err => console.error("Failed to stop scanner", err));
+                    } else {
+                        html5QrcodeScanner.clear();
+                        html5QrcodeScanner = null;
+                    }
+                } catch(e) {
+                    console.warn("Error checking scanner state", e);
                     html5QrcodeScanner = null;
-                }).catch(err => console.error("Failed to stop scanner", err));
+                }
             }
+        }
+
+        // File Scan Logic (Python-like static image processing)
+        const btnScanFile = document.getElementById('btnScanFile');
+        const fileScanInput = document.getElementById('fileScanInput');
+        
+        if(btnScanFile && fileScanInput){
+            btnScanFile.addEventListener('click', () => fileScanInput.click());
+            
+            fileScanInput.addEventListener('change', e => {
+                if (e.target.files.length == 0) return;
+                const imageFile = e.target.files[0];
+                
+                // Stop live camera if running
+                stopScanner();
+
+                // Use a fresh instance for file scanning
+                const fileScanner = new Html5Qrcode("reader");
+                setLoading(true, 'Analizando imagen...', true);
+                
+                fileScanner.scanFileV2(imageFile, true)
+                .then(result => {
+                    setLoading(false);
+                    // result.decodedText is the code
+                    onScanSuccess(result.decodedText, result);
+                })
+                .catch(err => {
+                    setLoading(false);
+                    console.error("Error scanning file", err);
+                    alert("No se detectó ningún código en la imagen. Intenta tomar la foto con mejor luz y enfoque.");
+                });
+            });
         }
 
         // Close button top right
