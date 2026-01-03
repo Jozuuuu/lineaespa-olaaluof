@@ -1539,12 +1539,9 @@
                         "ean_reader",
                         "ean_8_reader",
                         "code_39_reader",
-                        "code_39_vin_reader",
-                        "codabar_reader",
                         "upc_reader",
-                        "upc_e_reader",
-                        "i2of5_reader"
-                    ]
+                        "upc_e_reader"
+                    ] // Eliminados lectores propensos a errores (i2of5, codabar, vin)
                 },
                 locate: true
             }, function(err) {
@@ -1558,10 +1555,32 @@
                 isQuaggaRunning = true;
             });
 
+            // Estabilización de lectura: Requiere 3 lecturas idénticas consecutivas
+            let lastCode = null;
+            let codeCount = 0;
+
             Quagga.onDetected(function(result) {
                 var code = result.codeResult.code;
-                console.log("Barcode detected and processed : [" + code + "]", result);
-                onScanSuccess(code, result);
+                
+                // Ignorar lecturas vacías o muy cortas
+                if(!code || code.length < 3) return;
+
+                if(code === lastCode) {
+                    codeCount++;
+                    // Si leemos el mismo código 3 veces seguidas, lo damos por válido
+                    if(codeCount > 2) {
+                        console.log("Barcode confirmed : [" + code + "]", result);
+                        onScanSuccess(code, result);
+                        
+                        // Reiniciar contadores y detener temporalmente para evitar rebotes
+                        lastCode = null;
+                        codeCount = 0;
+                        stopScanner(); 
+                    }
+                } else {
+                    lastCode = code;
+                    codeCount = 1;
+                }
             });
         }
 
