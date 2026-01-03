@@ -34,7 +34,7 @@ const USERS_FILE = path.join(DATA_DIR, 'usuarios_server.json');
 const LOG_FILE = path.join(DATA_DIR, 'log_server.json');
 
 // Optional: Apps Script endpoint to forward items (set your deployed exec URL)
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbyQ9P8njniZrRNfiMGlKUolIkxKKmLExLpKv271_qMWIVkv5j3AqITlFaILE9UmgOr-/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwRpRM_SnH7p0_2DS4T4HHKjYuQnUpYVBZgqyr5-KSPVrr79UpUdtMDHfln4HVUlu73WA/exec';
 // Map server categories to inventory IDs expected by Apps Script
 const CATEGORY_TO_INVENTORY = { aluminio: '1', herrajes: '2', vidrio: '3', insumos: '4' };
 

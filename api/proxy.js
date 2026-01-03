@@ -1,7 +1,7 @@
 // Vercel Serverless function to forward requests to Google Apps Script (GAS)
 // Deploy this repo to Vercel; the function will be available at https://<your‑vercel>.vercel.app/api/proxy
 
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbyQ9P8njniZrRNfiMGlKUolIkxKKmLExLpKv271_qMWIVkv5j3AqITlFaILE9UmgOr-/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwRpRM_SnH7p0_2DS4T4HHKjYuQnUpYVBZgqyr5-KSPVrr79UpUdtMDHfln4HVUlu73WA/exec';
 
 module.exports = async (req, res) => {
   // Allow CORS from any origin (adjust in production)
