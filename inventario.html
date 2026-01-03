@@ -1549,41 +1549,23 @@
 
             html5QrcodeScanner = new Html5Qrcode("reader", { 
                 formatsToSupport: formats, 
-                verbose: false,
-                experimentalFeatures: {
-                    useBarCodeDetectorIfSupported: true
-                }
+                verbose: false
             });
             
-            // Configuración base
+            // Configuración estable (la que funcionaba mejor)
             const config = { 
-                fps: 15, 
-                qrbox: { width: 250, height: 200 },
+                fps: 10, 
+                qrbox: { width: 250, height: 150 }, 
                 aspectRatio: 1.0
             };
             
-            // Intento 1: Alta calidad (Enfoque continuo + Alta resolución)
-            // Ayuda mucho con cilindros y códigos pequeños
-            const constraintsHigh = { 
-                facingMode: "environment",
-                width: { min: 640, ideal: 1280, max: 1920 },
-                height: { min: 480, ideal: 720, max: 1080 },
-                advanced: [{ focusMode: "continuous" }]
-            };
-
-            // Intento 2: Básico (Solo cámara trasera)
-            // Fallback seguro si el dispositivo no soporta lo anterior
-            const constraintsBasic = { facingMode: "environment" };
+            // Sin restricciones avanzadas que causan pantalla negra
+            const constraints = { facingMode: "environment" };
             
-            // Lógica de reintento
-            html5QrcodeScanner.start(constraintsHigh, config, onScanSuccess)
+            html5QrcodeScanner.start(constraints, config, onScanSuccess)
             .catch(err => {
-                console.warn("Modo alta calidad falló, intentando modo básico...", err);
-                return html5QrcodeScanner.start(constraintsBasic, config, onScanSuccess);
-            })
-            .catch(err => {
-                console.error("Error fatal iniciando escáner", err);
-                alert("No se pudo iniciar la cámara. Por favor verifica los permisos.");
+                console.error("Error starting scanner", err);
+                alert("No se pudo iniciar la cámara. " + (err.message || ""));
                 stopScanner();
             });
         }
