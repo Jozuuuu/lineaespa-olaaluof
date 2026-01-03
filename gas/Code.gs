@@ -281,7 +281,11 @@ function doPost(e){
       Object.keys(HEADER_ALIASES).forEach(canonical => {
         if(p.hasOwnProperty(canonical) && headerMap[canonical] !== undefined){
           const idx = headerMap[canonical];
-          const val = p[canonical];
+          let val = p[canonical];
+          
+          // FIX: Preserve leading zeros for SKU by forcing text format
+          if(canonical === 'sku') val = "'" + val;
+          
           sh.getRange(rowIndex + 2, idx + 1).setValue(val);
           updates[canonical] = val;
         }
@@ -293,7 +297,12 @@ function doPost(e){
       headers.forEach((h,i)=>{
         const key = String(h||'').trim().toLowerCase();
         if(payloadNormalized.hasOwnProperty(key)){
-          const val = payloadNormalized[key];
+          let val = payloadNormalized[key];
+          
+          // FIX: Check if this header maps to SKU and preserve zeros
+          const canonical = Object.keys(HEADER_ALIASES).find(k => (HEADER_ALIASES[k]||[]).includes(key));
+          if(canonical === 'sku' || key === 'sku' || key === 'codigo') val = "'" + val;
+
           sh.getRange(rowIndex + 2, i + 1).setValue(val);
           updates[h] = val;
         }
@@ -448,15 +457,25 @@ function doPost(e){
       Object.keys(HEADER_ALIASES).forEach(canonical => {
         const idx = headerMap[canonical];
         if(idx !== undefined && idx !== -1){
-          const v = pick(canonical);
-          if(v !== null && v !== undefined) row[idx] = v;
+          let v = pick(canonical);
+          if(v !== null && v !== undefined) {
+            // FIX: Preserve leading zeros for SKU
+            if(canonical === 'sku') v = "'" + v;
+            row[idx] = v;
+          }
         }
       });
 
       // Also fill by raw header names
       headers.forEach((h,i)=>{
         const key = String(h||'').trim().toLowerCase();
-        if(payloadNormalized.hasOwnProperty(key)) row[i] = payloadNormalized[key];
+        if(payloadNormalized.hasOwnProperty(key)) {
+            let v = payloadNormalized[key];
+            // FIX: Check if this header maps to SKU and preserve zeros
+            const canonical = Object.keys(HEADER_ALIASES).find(k => (HEADER_ALIASES[k]||[]).includes(key));
+            if(canonical === 'sku' || key === 'sku' || key === 'codigo') v = "'" + v;
+            row[i] = v;
+        }
       });
 
       // Ensure imageUrl column receives imageUrl
