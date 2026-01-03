@@ -1545,21 +1545,35 @@
                 }
             });
             
-            // Configuración optimizada para cilindros y reflejos
+            // Configuración base
             const config = { 
-                fps: 20, 
-                qrbox: { width: 260, height: 180 },
-                aspectRatio: 1.0,
-                disableFlip: false
+                fps: 15, 
+                qrbox: { width: 250, height: 200 },
+                aspectRatio: 1.0
             };
             
-            // Restricciones de cámara estándar (mayor compatibilidad)
-            const constraints = { facingMode: "environment" };
+            // Intento 1: Alta calidad (Enfoque continuo + Alta resolución)
+            // Ayuda mucho con cilindros y códigos pequeños
+            const constraintsHigh = { 
+                facingMode: "environment",
+                width: { min: 640, ideal: 1280, max: 1920 },
+                height: { min: 480, ideal: 720, max: 1080 },
+                advanced: [{ focusMode: "continuous" }]
+            };
+
+            // Intento 2: Básico (Solo cámara trasera)
+            // Fallback seguro si el dispositivo no soporta lo anterior
+            const constraintsBasic = { facingMode: "environment" };
             
-            html5QrcodeScanner.start(constraints, config, onScanSuccess)
+            // Lógica de reintento
+            html5QrcodeScanner.start(constraintsHigh, config, onScanSuccess)
             .catch(err => {
-                console.error("Error starting scanner", err);
-                alert("No se pudo iniciar la cámara. " + (err.message || ""));
+                console.warn("Modo alta calidad falló, intentando modo básico...", err);
+                return html5QrcodeScanner.start(constraintsBasic, config, onScanSuccess);
+            })
+            .catch(err => {
+                console.error("Error fatal iniciando escáner", err);
+                alert("No se pudo iniciar la cámara. Por favor verifica los permisos.");
                 stopScanner();
             });
         }
