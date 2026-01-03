@@ -1497,8 +1497,8 @@
             currentScannedItem = null;
             currentScannedCat = null;
             scanQty.value = 1;
-            // Resume Quagga if it was paused (though Quagga doesn't have a pause state like html5-qrcode, we just ensure it's running)
-            // If we stopped it, we might need to restart, but usually we just hide the modal.
+            // Resume Quagga scanning logic
+            isScanningPaused = false;
         }
 
         btnCameraScan.addEventListener('click', ()=>{
@@ -1512,9 +1512,13 @@
         });
 
         let isQuaggaRunning = false;
+        let isScanningPaused = false;
 
         function startScanner(){
-            if(isQuaggaRunning) return;
+            if(isQuaggaRunning) {
+                isScanningPaused = false;
+                return;
+            }
 
             Quagga.init({
                 inputStream : {
@@ -1556,10 +1560,8 @@
             });
 
             // Estabilización de lectura: Requiere 3 lecturas idénticas consecutivas
-            let lastCode = null;
-            let codeCount = 0;
+            let if(isScanningPaused) return;
 
-            Quagga.onDetected(function(result) {
                 var code = result.codeResult.code;
                 
                 // Ignorar lecturas vacías o muy cortas
@@ -1570,8 +1572,16 @@
                     // Si leemos el mismo código 3 veces seguidas, lo damos por válido
                     if(codeCount > 2) {
                         console.log("Barcode confirmed : [" + code + "]", result);
+                        
+                        // Pausar lógica de escaneo pero mantener cámara activa
+                        isScanningPaused = true;
+                        
                         onScanSuccess(code, result);
                         
+                        // Reiniciar contadores
+                        lastCode = null;
+                        codeCount = 0;
+                        // No detenemos la cámara (stopScanner) para que no se ponga negra
                         // Reiniciar contadores y detener temporalmente para evitar rebotes
                         lastCode = null;
                         codeCount = 0;
