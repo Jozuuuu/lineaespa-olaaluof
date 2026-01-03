@@ -1552,20 +1552,20 @@
                 verbose: false
             });
             
-            // Configuración inspirada en el script de Python (Velocidad > Resolución)
+            // Configuración: Usar detector nativo (igual que Python/Android nativo)
+            // Esto es lo más rápido y potente que permite el navegador
             const config = { 
-                fps: 20, // Más fluido para captar movimiento
+                fps: 15, 
                 qrbox: { width: 250, height: 150 }, 
-                aspectRatio: 1.0
+                aspectRatio: 1.0,
+                experimentalFeatures: {
+                    useBarCodeDetectorIfSupported: true
+                }
             };
             
-            // FORZAR resolución 640x480 como en el script de Python
-            // Esto reduce el desenfoque de movimiento y acelera la detección
-            const constraints = { 
-                facingMode: "environment",
-                width: { ideal: 640 },
-                height: { ideal: 480 }
-            };
+            // Restricción MÍNIMA: Solo pedir cámara trasera.
+            // Eliminamos cualquier petición de resolución o enfoque para evitar bloqueos.
+            const constraints = { facingMode: "environment" };
             
             html5QrcodeScanner.start(constraints, config, onScanSuccess)
             .catch(err => {
