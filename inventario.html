@@ -4,7 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Inventario - Aluoferta</title>
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <!-- Replaced html5-qrcode with QuaggaJS for better barcode support -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
     <link rel="stylesheet" href="styles.css">
     <style>
         /* Loading Overlay */
@@ -1496,14 +1497,8 @@
             currentScannedItem = null;
             currentScannedCat = null;
             scanQty.value = 1;
-            if(html5QrcodeScanner) {
-                try{ 
-                    // Resume scanning if paused
-                    if(html5QrcodeScanner.getState() === 3){ // PAUSED
-                        html5QrcodeScanner.resume(); 
-                    }
-                }catch(e){ console.warn('Resume failed',e); }
-            }
+            // Resume Quagga if it was paused (though Quagga doesn't have a pause state like html5-qrcode, we just ensure it's running)
+            // If we stopped it, we might need to restart, but usually we just hide the modal.
         }
 
         btnCameraScan.addEventListener('click', ()=>{
@@ -1516,87 +1511,69 @@
             cameraScanModal.classList.add('hidden');
         });
 
-        function startScanner(){
-            // Limpieza robusta antes de iniciar
-            if(html5QrcodeScanner) {
-                try { 
-                    html5QrcodeScanner.stop().then(()=>{ 
-                        html5QrcodeScanner.clear(); 
-                        html5QrcodeScanner=null; 
-                        setTimeout(startScanner, 200); 
-                    }).catch(err=>{
-                        console.warn('Stop failed', err);
-                        html5QrcodeScanner=null;
-                        setTimeout(startScanner, 200);
-                    });
-                } catch(e){ 
-                    html5QrcodeScanner=null; 
-                    setTimeout(startScanner, 200);
-                }
-                return;
-            }
-            
-            const formats = [
-                Html5QrcodeSupportedFormats.QR_CODE,
-                Html5QrcodeSupportedFormats.EAN_13,
-                Html5QrcodeSupportedFormats.EAN_8,
-                Html5QrcodeSupportedFormats.CODE_128,
-                Html5QrcodeSupportedFormats.CODE_39,
-                Html5QrcodeSupportedFormats.UPC_A,
-                Html5QrcodeSupportedFormats.UPC_E,
-                Html5QrcodeSupportedFormats.CODABAR
-            ];
+        let isQuaggaRunning = false;
 
-            html5QrcodeScanner = new Html5Qrcode("reader", { 
-                formatsToSupport: formats, 
-                verbose: false
-            });
-            
-            // Configuración: Usar detector nativo (igual que Python/Android nativo)
-            // Esto es lo más rápido y potente que permite el navegador
-            const config = { 
-                fps: 15, 
-                qrbox: { width: 250, height: 150 }, 
-                aspectRatio: 1.0,
-                experimentalFeatures: {
-                    useBarCodeDetectorIfSupported: true
+        function startScanner(){
+            if(isQuaggaRunning) return;
+
+            Quagga.init({
+                inputStream : {
+                    name : "Live",
+                    type : "LiveStream",
+                    target: document.querySelector('#reader'), // Or '#yourElement' (optional)
+                    constraints: {
+                        width: 640,
+                        height: 480,
+                        facingMode: "environment" // or user
+                    }
+                },
+                locator: {
+                    patchSize: "medium",
+                    halfSample: true
+                },
+                numOfWorkers: 2,
+                frequency: 10,
+                decoder : {
+                    readers : [
+                        "code_128_reader",
+                        "ean_reader",
+                        "ean_8_reader",
+                        "code_39_reader",
+                        "code_39_vin_reader",
+                        "codabar_reader",
+                        "upc_reader",
+                        "upc_e_reader",
+                        "i2of5_reader"
+                    ]
+                },
+                locate: true
+            }, function(err) {
+                if (err) {
+                    console.log(err);
+                    alert("Error iniciando Quagga: " + err);
+                    return;
                 }
-            };
-            
-            // Restricción MÍNIMA: Solo pedir cámara trasera.
-            // Eliminamos cualquier petición de resolución o enfoque para evitar bloqueos.
-            const constraints = { facingMode: "environment" };
-            
-            html5QrcodeScanner.start(constraints, config, onScanSuccess)
-            .catch(err => {
-                console.error("Error starting scanner", err);
-                alert("No se pudo iniciar la cámara. " + (err.message || ""));
-                stopScanner();
+                console.log("Initialization finished. Ready to start");
+                Quagga.start();
+                isQuaggaRunning = true;
+            });
+
+            Quagga.onDetected(function(result) {
+                var code = result.codeResult.code;
+                console.log("Barcode detected and processed : [" + code + "]", result);
+                onScanSuccess(code, result);
             });
         }
-
 
         function stopScanner(){
-            if(html5QrcodeScanner){
-                // Check if it's running (isScanning is not always reliable in all versions, but state is)
-                try {
-                    if(html5QrcodeScanner.getState() === 2 || html5QrcodeScanner.getState() === 3) { // SCANNING or PAUSED
-                        html5QrcodeScanner.stop().then(() => {
-                            html5QrcodeScanner.clear();
-                            html5QrcodeScanner = null;
-                        }).catch(err => console.error("Failed to stop scanner", err));
-                    } else {
-                        html5QrcodeScanner.clear();
-                        html5QrcodeScanner = null;
-                    }
-                } catch(e) {
-                    console.warn("Error checking scanner state", e);
-                    html5QrcodeScanner = null;
-                }
+            if(isQuaggaRunning){
+                Quagga.stop();
+                isQuaggaRunning = false;
+                Quagga.offDetected(); // Remove listeners to avoid duplicates
             }
         }
 
-        // File Scan Logic (Python-like static image processing)
+        // File Scan Logic (Quagga static image processing)
         const btnScanFile = document.getElementById('btnScanFile');
         const fileScanInput = document.getElementById('fileScanInput');
         
@@ -1605,25 +1582,28 @@
             
             fileScanInput.addEventListener('change', e => {
                 if (e.target.files.length == 0) return;
-                const imageFile = e.target.files[0];
+                const imageFile = URL.createObjectURL(e.target.files[0]);
                 
                 // Stop live camera if running
                 stopScanner();
 
-                // Use a fresh instance for file scanning
-                const fileScanner = new Html5Qrcode("reader");
                 setLoading(true, 'Analizando imagen...', true);
                 
-                fileScanner.scanFileV2(imageFile, true)
-                .then(result => {
+                Quagga.decodeSingle({
+                    decoder: {
+                        readers: ["code_128_reader", "ean_reader", "ean_8_reader", "code_39_reader", "code_39_vin_reader", "codabar_reader", "upc_reader", "upc_e_reader", "i2of5_reader"]
+                    },
+                    locate: true,
+                    src: imageFile
+                }, function(result){
                     setLoading(false);
-                    // result.decodedText is the code
-                    onScanSuccess(result.decodedText, result);
-                })
-                .catch(err => {
-                    setLoading(false);
-                    console.error("Error scanning file", err);
-                    alert("No se detectó ningún código en la imagen. Intenta tomar la foto con mejor luz y enfoque.");
+                    if(result && result.codeResult) {
+                        console.log("File scan result:", result.codeResult.code);
+                        onScanSuccess(result.codeResult.code, result);
+                    } else {
+                        console.warn("No barcode found in file");
+                        alert("No se detectó ningún código en la imagen. Intenta tomar la foto con mejor luz y enfoque.");
+                    }
                 });
             });
         }
