@@ -1433,6 +1433,22 @@
             }
         }
 
+        function openAddFormFromScanner(cat, code){
+            resetScannerUI();
+            // Close camera modal if open
+            cameraScanModal.classList.add('hidden');
+            stopScanner();
+            
+            // Switch to the selected category if needed
+            if(categoriaSel.value !== cat && cat !== 'todas'){
+                categoriaSel.value = cat;
+                populateFilterOptions(cat);
+            }
+            
+            // Open form with prefilled code
+            renderForm(cat, { codigo: code });
+        }
+
         async function handleScanAction(isEntry){
             if(!currentScannedItem || !currentScannedCat) return;
             
