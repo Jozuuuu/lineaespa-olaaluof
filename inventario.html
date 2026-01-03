@@ -1552,15 +1552,20 @@
                 verbose: false
             });
             
-            // Configuración estable (la que funcionaba mejor)
+            // Configuración inspirada en el script de Python (Velocidad > Resolución)
             const config = { 
-                fps: 10, 
+                fps: 20, // Más fluido para captar movimiento
                 qrbox: { width: 250, height: 150 }, 
                 aspectRatio: 1.0
             };
             
-            // Sin restricciones avanzadas que causan pantalla negra
-            const constraints = { facingMode: "environment" };
+            // FORZAR resolución 640x480 como en el script de Python
+            // Esto reduce el desenfoque de movimiento y acelera la detección
+            const constraints = { 
+                facingMode: "environment",
+                width: { ideal: 640 },
+                height: { ideal: 480 }
+            };
             
             html5QrcodeScanner.start(constraints, config, onScanSuccess)
             .catch(err => {
