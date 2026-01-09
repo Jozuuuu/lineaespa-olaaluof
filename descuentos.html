@@ -6,29 +6,188 @@
 <title>Hoja de Corte – Línea Española</title>
 
 <link rel="stylesheet" href="styles.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+    if(!localStorage.getItem('activo')){
+        window.location.href = 'index.html';
+    }
+</script>
+<style>
+  /* Dashboard Theme Overrides */
+  body {
+      background-color: var(--bg);
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  
+  .dashboard-container {
+      width: 100%;
+      max-width: 1200px;
+      padding: 20px;
+      animation: fadeIn 0.5s ease-out;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--card-bg);
+      padding: 24px 32px;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 20px;
+  }
+  
+  .header-branding { display: flex; align-items: center; gap: 20px; }
+  .header-logo { height: 48px; width: auto; }
+  
+  .header-left h1 { margin: 0; font-size: 1.5rem; color: var(--primary); font-weight: 800; }
+  .header-left p { margin: 4px 0 0; color: var(--text-light); }
+
+  .calc-grid {
+      display: grid;
+      grid-template-columns: 400px 1fr;
+      gap: 24px;
+      align-items: start;
+  }
+
+  .card-panel {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 24px;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border);
+  }
+
+  /* Form Elements */
+  .control-group { margin-bottom: 20px; }
+  .control-group label { display: block; font-weight: 600; margin-bottom: 8px; color: var(--text); font-size: 0.95rem; }
+  .control-group input, .control-group select {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg);
+      font-size: 1rem;
+      transition: var(--transition);
+      color: var(--text);
+  }
+  .control-group input:focus, .control-group select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+      background: white;
+  }
+
+  /* Measures grid specific */
+  .measures-container {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+  }
+  .measures-container .control-group {
+      flex: 1 1 150px; /* Grow, shrink, base 150px */
+      margin-bottom: 0; /* Handled by container gap/wrap if needed, but flex gap handles horizontal */
+  }
+
+  /* Results Table */
+  .table-responsive { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
+  th { text-align: left; padding: 12px; background: var(--bg); color: var(--text-light); border-bottom: 2px solid var(--border); font-weight: 600; }
+  td { padding: 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; color: var(--text); }
+  td img.perfil-img { height: 40px; display: block; }
+  
+  .hoja-preview-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      padding: 16px;
+      background: var(--bg);
+      border-radius: var(--radius);
+      text-align: center;
+  }
+  .hoja-preview-img { max-height: 120px; width: auto; mix-blend-mode: multiply; }
+
+  /* Buttons */
+  .btn { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; border: none; padding: 10px 20px; border-radius: var(--radius); transition: all 0.2s; text-decoration: none; font-size: 0.95rem; }
+  .btn-primary { background: var(--primary); color: white; }
+  .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
+  .btn-outline { background: white; border: 1px solid var(--border); color: var(--text); }
+  .btn-outline:hover { background: var(--bg); border-color: var(--text-light); }
+  .btn-danger { background: #fee2e2; color: #ef4444; border: 1px solid #fecaca; }
+  .btn-danger:hover { background: #fee2e2; border-color: #ef4444; }
+
+  /* Saved Items */
+  .saved-item {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 20px;
+    position: relative;
+    box-shadow: var(--shadow-sm);
+  }
+  .saved-item h3 { margin: 0 0 15px 0; padding-bottom: 10px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; color: var(--primary); font-size: 1.1rem; }
+  
+  .hidden { display: none !important; }
+  .w-full { width: 100%; }
+  .mt-4 { margin-top: 1rem; }
+
+  @media (max-width: 900px) {
+      .calc-grid { grid-template-columns: 1fr; }
+  }
+
+  /* Estilos para Impresión / PDF */
+  @media print {
+      body { background: white; display: block; padding: 0; }
+      .dashboard-container { max-width: 100%; padding: 0; margin: 0; }
+      .dashboard-header, .calc-grid, .btn { display: none !important; }
+      #zonaAcumulados { display: block !important; margin: 0 !important; box-shadow: none !important; border: none !important; padding: 0 !important; }
+      .saved-item { border: none !important; border-bottom: 1px solid #000 !important; box-shadow: none !important; page-break-inside: avoid; }
+      .saved-item button { display: none !important; }
+      h2 { color: black !important; }
+  }
+</style>
 </head>
 <body>
 
-<!-- REEMPLAZA el agrupamiento original de tarjetas por este contenedor grid -->
-<div class="container">
-  <div class="header-bar">
-    <img src="img/aluoferta_logo.png" alt="Aluoferta" class="logo">
-    <a href="index.html" class="btn btn-outline" style="white-space:nowrap">Volver al inicio</a>
+<div class="dashboard-container">
+  
+  <div class="dashboard-header">
+    <div class="header-branding">
+        <img src="https://aluoferta.com/wp-content/uploads/2021/03/logo-aluoferta.png" alt="Aluoferta" class="header-logo" onerror="this.src='img/aluoferta_logo.png'">
+        <div class="header-left">
+            <h1>Calculadora de Cortes</h1>
+            <p>Optimización y cálculo de material — Línea Española</p>
+        </div>
+    </div>
+    <a href="menu.html" class="btn btn-outline">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+        Volver al Menú
+    </a>
   </div>
-  <h1>Hoja de Corte — Sistemas Españoles</h1>
 
-  <div class="grid">
-    <!-- sección izquierda: formulario (mantener mismo contenido dentro) -->
-    <div class="card">
-      <h2>Datos generales</h2>
+  <div class="calc-grid">
+    <!-- Panel Izquierdo: Configuración -->
+    <div class="card-panel">
+      <h2 style="margin-top:0; color:var(--primary); font-size:1.2rem; margin-bottom:20px;">Configuración</h2>
 
       <div class="control-group">
-        <label>Línea</label>
+        <label>Línea de Perfil</label>
         <select id="linea" onchange="configurarLinea()">
-        <option value="">-- Selecciona --</option>
-        <option value="1400">1400</option>
-        <option value="3500">3500</option>
-        <option value="4600">4600</option>
+            <option value="">-- Selecciona --</option>
+            <option value="1400">1400 (Abatible)</option>
+            <option value="3500">3500 (Corrediza)</option>
+            <option value="4600">4600 (Perímetros y Monumental)</option>
         </select>
       </div>
 
@@ -37,29 +196,65 @@
         <select id="tipo"></select>
       </div>
 
-      <div class="control-group">
-        <label>Ancho B (mm)</label>
-        <input type="number" id="B" placeholder="Ej. 1800">
+      <div class="measures-container">
+          <div class="control-group">
+            <label>Ancho (mm)</label>
+            <input type="number" id="B" placeholder="Ej. 1800">
+          </div>
+
+          <div class="control-group">
+            <label>Alto (mm)</label>
+            <input type="number" id="A" placeholder="Ej. 2100">
+          </div>
       </div>
 
-      <div class="control-group">
-        <label>Alto A (mm)</label>
-        <input type="number" id="A" placeholder="Ej. 2100">
-      </div>
-
-      <button class="btn btn-primary mt-4" onclick="calcular()">Calcular cortes</button>
+      <button class="btn btn-primary w-full mt-4" onclick="calcular()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Calcular Material
+      </button>
     </div>
 
-    <!-- sección derecha: resultados -->
-    <div class="card result-layout">
-      <h2>Resultados de corte</h2>
-      <div id="resultado">—</div>
-      <div class="hint">Vista previa de hoja + miniaturas optimizadas para impresión y revisión.</div>
+    <!-- Panel Derecho: Resultados -->
+    <div class="card-panel">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+          <h2 style="margin:0; color:var(--primary); font-size:1.2rem;">Resultados</h2>
+          <div id="actionButtons" class="hidden">
+              <button class="btn btn-outline" style="border-color:var(--accent); color:var(--accent);" onclick="agregarAComulados()">
+                + Agregar a Lista
+              </button>
+          </div>
+      </div>
+      
+      <div id="resultado" style="min-height:200px; display:flex; flex-direction:column; justify-content:center;">
+          <div style="text-align:center; color:var(--text-light);">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="1.5" style="margin-bottom:10px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
+              <p>Selecciona una línea y dimensiones para ver el despiece.</p>
+          </div>
+      </div>
     </div>
   </div>
+
+  <!-- Sección de Acumulados -->
+  <div id="zonaAcumulados" class="card-panel hidden" style="margin-top: 24px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; padding-bottom:16px; border-bottom:1px solid var(--border);">
+        <h2 style="margin:0; color:var(--primary);">Hoja de Pedido / Resumen</h2>
+        <div style="display:flex; gap:10px;">
+            <button class="btn btn-danger" onclick="limpiarTodo()">Limpiar Todo</button>
+            <button class="btn btn-primary" onclick="exportarPDF()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Descargar PDF
+            </button>
+        </div>
+      </div>
+      <div id="listaItems"></div>
+  </div>
+
 </div>
 
 <script>
+let ultimoCalculo = null;
+let listaCortes = [];
+
 function configurarLinea(){
 let linea=document.getElementById("linea").value;
 let tipo=document.getElementById("tipo");
@@ -96,11 +291,16 @@ tipo.innerHTML+=`
 
 function fila(n,c,m,co){
   const img=getImageForPerfil(n);
+  // Limitar decimales a máximo 2
+  let medida = m;
+  if(typeof m === 'number'){
+      medida = parseFloat(m.toFixed(2));
+  }
   return `<tr>
     <td>${n}</td>
     <td><img class="perfil-img" src="${img}" alt="${n}"></td>
     <td>${c}</td>
-    <td>${m} mm</td>
+    <td>${medida} mm</td>
     <td>${co}</td>
   </tr>`;
 }
@@ -232,7 +432,7 @@ let B=parseFloat(document.getElementById("B").value);
 
 if(!tipo||isNaN(A)||isNaN(B)){
 document.getElementById("resultado").innerHTML=
-'<div class="alert">Completa todos los datos</div>';
+'<div style="text-align:center; padding:30px; color:#ef4444; background:#fef2f2; border-radius:8px;">⚠️ Por favor completa la selección de línea y medidas</div>';
 return;
 }
 
@@ -243,13 +443,12 @@ currentTipoSeleccionado = tipo;
 const hojaImg = getHojaImage(tipo);
 const hojaTitle = getHojaTitle(tipo);
 const preview = `<div class="hoja-preview-wrap">
-  <div><strong>Hoja seleccionada:</strong></div>
   <img class="hoja-preview-img" src="${hojaImg}" alt="${hojaTitle}">
-  <div>${hojaTitle}</div>
+  <div style="font-weight:600; font-size:0.9rem; color:var(--text);">${hojaTitle}</div>
 </div>`;
 
 let h=`<div class="table-responsive"><table>
-<tr><th>Perfil</th><th>Imagen</th><th>Cant.</th><th>Medida</th><th>Corte</th></tr>`;
+<tr><th>Perfil</th><th>Img</th><th>Cant.</th><th>Medida</th><th>Corte</th></tr>`;
 /* =======================
    LÍNEA 1400
 ======================= */
@@ -265,7 +464,7 @@ h+=`<tr>
   <td>Junquillo</td>
   <td><img class="perfil-img" src="${getImageForPerfil('Junquillo')}" alt="Junquillo"></td>
   <td>4</td>
-  <td><strong>Debe medirse</strong></td>
+  <td><strong>Obra</strong></td>
   <td>—</td>
 </tr>`;
 }
@@ -280,7 +479,7 @@ h+=`<tr>
   <td>Junquillo</td>
   <td><img class="perfil-img" src="${getImageForPerfil('Junquillo')}" alt="Junquillo"></td>
   <td>4</td>
-  <td><strong>Debe medirse</strong></td>
+  <td><strong>Obra</strong></td>
   <td>—</td>
 </tr>`;
 }
@@ -296,7 +495,7 @@ h+=`<tr>
   <td>Junquillo</td>
   <td><img class="perfil-img" src="${getImageForPerfil('Junquillo')}" alt="Junquillo"></td>
   <td>4</td>
-  <td><strong>Debe medirse</strong></td>
+  <td><strong>Obra</strong></td>
   <td>—</td>
 </tr>`;
 }
@@ -312,7 +511,7 @@ h+=`<tr>
   <td>Junquillo</td>
   <td><img class="perfil-img" src="${getImageForPerfil('Junquillo')}" alt="Junquillo"></td>
   <td>4</td>
-  <td><strong>Debe medirse</strong></td>
+  <td><strong>Obra</strong></td>
   <td>—</td>
 </tr>`;
 }
@@ -329,7 +528,7 @@ h+=`<tr>
   <td>Junquillo</td>
   <td><img class="perfil-img" src="${getImageForPerfil('Junquillo')}" alt="Junquillo"></td>
   <td>4</td>
-  <td><strong>Debe medirse</strong></td>
+  <td><strong>Obra</strong></td>
   <td>—</td>
 </tr>`;
 }
@@ -441,6 +640,91 @@ h+=fila("Unión cuatro hojas",1,A-90,"90°");
 
 h+="</table></div>";
 document.getElementById("resultado").innerHTML = preview + h;
+document.getElementById("actionButtons").classList.remove("hidden");
+
+// Guardar datos temporalmente para poder agregar
+ultimoCalculo = {
+    titulo: `Línea ${document.getElementById("linea").value} - ${getHojaTitle(tipo)}`,
+    medidas: `Ancho: ${B}mm x Alto: ${A}mm`,
+    html: h,
+    preview: preview
+};
+}
+
+function agregarAComulados(){
+    if(!ultimoCalculo) return;
+    
+    listaCortes.push({...ultimoCalculo, id: Date.now()});
+    renderLista();
+    
+    // Scroll al área de acumulados
+    document.getElementById("zonaAcumulados").classList.remove("hidden");
+    document.getElementById("listaItems").scrollIntoView({behavior: 'smooth'});
+}
+
+function renderLista(){
+    const contenedor = document.getElementById("listaItems");
+    const zona = document.getElementById("zonaAcumulados");
+    
+    if(listaCortes.length === 0){
+        zona.classList.add("hidden");
+        return;
+    }
+    zona.classList.remove("hidden");
+    
+    contenedor.innerHTML = listaCortes.map((item, index) => `
+        <div class="saved-item" id="item-${item.id}">
+            <h3>
+                <span>
+                    <strong>#${index + 1}</strong> ${item.titulo} 
+                    <small style="color:#64748b; margin-left:10px;">(${item.medidas})</small>
+                </span>
+                <button class="btn btn-danger" style="font-size:0.8rem; padding:4px 10px;" onclick="eliminarItem(${item.id})">Eliminar</button>
+            </h3>
+            <div style="display:grid; grid-template-columns: 200px 1fr; gap:24px; align-items:start; margin-top:10px;">
+                <div style="text-align:center;">${item.preview}</div>
+                <div>${item.html}</div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function eliminarItem(id){
+    listaCortes = listaCortes.filter(i => i.id !== id);
+    renderLista();
+}
+
+function limpiarTodo(){
+    if(confirm('¿Borrar toda la lista?')){
+        listaCortes = [];
+        renderLista();
+    }
+}
+
+function exportarPDF(){
+    const element = document.getElementById('listaItems');
+    if(!element || listaCortes.length === 0) return alert("No hay datos para exportar");
+
+    // Intentar usar librería si está disponible
+    if(typeof html2pdf !== 'undefined'){
+        const opt = {
+          margin:       10,
+          filename:     `Cortes_Aluminio_${new Date().toISOString().slice(0,10)}.pdf`,
+          image:        { type: 'jpeg', quality: 0.98 },
+          html2canvas:  { scale: 2, useCORS: true, logging: false },
+          jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        // .save() devuelve una promesa
+        html2pdf().set(opt).from(element).save().catch(err => {
+            console.error("Fallo librería PDF, usando nativo:", err);
+            window.print();
+        });
+    } else {
+        // Fallback: usar impresión nativa del navegador (Guardar como PDF)
+        // Gracias al CSS @media print, solo saldrá la lista
+        window.print();
+    }
 }
 </script>
 

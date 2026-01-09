@@ -6,10 +6,424 @@
     <title>Inventario - Aluoferta</title>
     <!-- Replaced html5-qrcode with QuaggaJS for better barcode support -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+    <script>
+        // Security Check
+        const role = localStorage.getItem('rol');
+        if(role === 'taller'){
+            alert('Acceso Restringido: Tu perfil "Taller" no tiene permiso para acceder al inventario.');
+            window.location.href = 'menu.html';
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <link rel="stylesheet" href="styles.css">
     <style>
-        /* Loading Overlay */
-        #loadingOverlay {
+    /* Dashboard Theme Integration */
+    .dashboard-container {
+        width: 100%;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        animation: fadeIn 0.5s ease-out;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .dashboard-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: var(--card-bg);
+        padding: 24px 32px;
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        border: 1px solid var(--border);
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 20px;
+    }
+
+    .header-branding { display: flex; align-items: center; gap: 20px; }
+    .header-logo { height: 48px; width: auto; }
+
+    .card-panel {
+        background: var(--card-bg);
+        border-radius: var(--radius);
+        padding: 24px;
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border);
+        margin-bottom: 24px;
+    }
+
+    /* Mode Switcher Modernization */
+    .mode-switcher {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+    .mode-btn {
+        flex: 1;
+        padding: 16px;
+        border: 1px solid var(--border);
+        background: var(--card-bg);
+        color: var(--text-light);
+        border-radius: var(--radius);
+        font-weight: 600;
+        cursor: pointer;
+        transition: var(--transition);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        font-size: 1rem;
+        box-shadow: var(--shadow-sm);
+    }
+    .mode-btn:hover { background: #f8fafc; color: var(--text); transform: translateY(-1px); }
+    .mode-btn.active {
+        border-color: var(--accent);
+        background: #eff6ff; 
+        color: var(--accent);
+        box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.1);
+    }
+
+    /* Controls Modernization */
+    .controls-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        align-items: end;
+    }
+
+    /* Form Area Modernization (created by JS) */
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 24px;
+        margin-bottom: 24px;
+    }
+    .form-field {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .form-field label {
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: var(--text);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 16px;
+        margin-top: 32px;
+        padding-top: 24px;
+        border-top: 1px solid var(--border);
+    }
+
+    /* Admin Panel Pro Styles (Modal View) */
+    .admin-panel {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) scale(0.95);
+        width: 95%;
+        max-width: 1000px;
+        max-height: 90vh;
+        background: #ffffff;
+        border-radius: 16px;
+        /* Backdrop simulation using shadow */
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 100vmax rgba(15, 23, 42, 0.5);
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .admin-panel:not(.hidden) {
+        opacity: 1;
+        visibility: visible;
+        transform: translate(-50%, -50%) scale(1);
+    }
+
+    .admin-header {
+        background: #ffffff;
+        padding: 20px 24px;
+        border-bottom: 1px solid #f1f5f9;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .admin-header h3 {
+        margin: 0;
+        color: #0f172a;
+        font-size: 1.25rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        letter-spacing: -0.02em;
+    }
+
+    .admin-content {
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        overflow: hidden; /* For scrolling inside tabs if needed */
+        background: #f8fafc;
+    }
+
+    /* Admin Navigation Tabs */
+    .admin-nav {
+        display: flex;
+        gap: 0;
+        padding: 0 24px;
+        background: #ffffff;
+        border-bottom: 1px solid #e2e8f0;
+        margin-bottom: 0;
+        width: 100%;
+    }
+
+    .admin-tab-btn {
+        padding: 16px 20px;
+        border: none;
+        border-bottom: 2px solid transparent;
+        border-radius: 0;
+        font-weight: 600;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        background: transparent;
+        color: #64748b;
+        margin-bottom: -1px;
+    }
+
+    .admin-tab-btn:hover {
+        color: #0f172a;
+        background: #f8fafc;
+    }
+
+    .admin-tab-btn.active {
+        background: transparent;
+        color: #2563eb;
+        border-bottom-color: #2563eb;
+    }
+
+    /* Admin View Containers */
+    #adminUsersView, #adminLogView {
+        padding: 24px;
+        overflow-y: auto;
+        flex: 1;
+    }
+
+    /* Admin Tables */
+    .admin-table-responsive {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        overflow: hidden;
+        background: white;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+
+    .admin-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+    }
+
+    .admin-table th {
+        background: #f8fafc;
+        color: #475569;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
+        padding: 16px;
+        text-align: left;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .admin-table td {
+        padding: 16px;
+        border-bottom: 1px solid #f1f5f9;
+        color: #334155;
+        vertical-align: middle;
+    }
+
+
+    .admin-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .admin-table tr:hover td {
+        background: #f8fafc;
+    }
+
+    /* Toolbars inside tabs */
+    .admin-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .admin-toolbar h4 {
+        font-size: 1rem;
+        color: #1e293b;
+        margin: 0;
+        font-weight: 600;
+    }
+
+    .admin-btn-secondary {
+        border: 1px solid #cbd5e1;
+        background: white;
+        color: #475569;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+    }
+    
+    .admin-btn-secondary:hover {
+        background: #f8fafc;
+        border-color: #94a3b8;
+        color: #0f172a;
+    }
+
+    /* Mobile / Responsive Optimizations for Admin */
+    @media (max-width: 640px) {
+        .admin-panel {
+            width: 100%;
+            height: 100%; /* Full screen on mobile */
+            max-height: 100%;
+            border-radius: 0;
+            top: 0; 
+            left: 0;
+            transform: none;
+        }
+
+        .admin-panel:not(.hidden) {
+            transform: none;
+        }
+
+        .admin-header {
+            padding: 16px;
+        }
+
+        .admin-nav {
+            padding: 0 16px;
+            overflow-x: auto; /* Scrollable tabs */
+        }
+        
+        .admin-tab-btn {
+            padding: 12px 16px;
+            white-space: nowrap;
+        }
+
+        #adminUsersView, #adminLogView {
+            padding: 16px;
+        }
+
+        .admin-toolbar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        
+        .admin-toolbar div {
+            display: flex;
+            width: 100%;
+        }
+        
+        .admin-toolbar input {
+            flex: 1;
+        }
+
+        /* Card Card-View for Tables on Mobile to avoid horizontal scroll */
+        .admin-table, .admin-table thead, .admin-table tbody, .admin-table th, .admin-table td, .admin-table tr { 
+            display: block; 
+        }
+        
+        .admin-table thead tr { 
+            position: absolute;
+            top: -9999px;
+            left: -9999px;
+        }
+        
+        .admin-table tr { 
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background: #fff;
+            margin-bottom: 12px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        
+        .admin-table td { 
+            border: none;
+            border-bottom: 1px solid #f1f5f9; 
+            position: relative;
+            padding-left: 50%; 
+            padding-top: 12px;
+            padding-bottom: 12px;
+            text-align: right;
+        }
+
+        .admin-table td:before { 
+            position: absolute;
+            top: 12px;
+            left: 16px;
+            width: 45%; 
+            padding-right: 10px; 
+            white-space: nowrap;
+            text-align: left;
+            font-weight: 600;
+            color: #64748b;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            content: attr(data-label);
+        }
+        
+        .admin-table tr td:last-child {
+            border-bottom: none;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .admin-table-responsive {
+            border: none;
+            background: transparent;
+            box-shadow: none;
+            overflow: visible;
+        }
+    }
+
+    /* Badges */
+
+     .badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 8px;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
+    .badge-success { background: #dcfce7; color: #166534; }
+    .badge-warning { background: #fef3c7; color: #92400e; }
+    
+    #loadingOverlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(255, 255, 255, 0.8);
@@ -75,49 +489,138 @@
         <div class="loading-text" id="loadingText">Cargando...</div>
     </div>
 
-    <div class="container">
-        <div class="header-bar">
-            <img src="https://aluoferta.com/wp-content/uploads/2021/03/logo-aluoferta.png" alt="Aluoferta" class="logo" style="margin: 0; height: 40px;" onerror="this.src='img/aluoferta_logo.png'">
-            <div class="user-info">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                <span>Hola, <b id="usuarioActivo">-</b></span>
+    <!-- Notification Container -->
+    <div id="notification-container"></div>
+
+
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <div class="header-branding">
+                 <img src="https://aluoferta.com/wp-content/uploads/2021/03/logo-aluoferta.png" alt="Aluoferta" class="header-logo" onerror="this.src='img/aluoferta_logo.png'">
             </div>
-            <button id="btnLogout" class="btn btn-outline" style="color: #ef4444; border-color: #fecaca;">Cerrar sesión</button>
+            <div style="display: flex; align-items: center; gap: 16px;">
+                <div class="user-info" style="display:flex; align-items:center; gap:8px; color:var(--text); font-weight:500;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    <span>Hola, <b id="usuarioActivo">-</b></span>
+                </div>
+                <button id="btnToggleAdmin" class="hidden" title="Panel Administrador" style="padding: 8px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--text-light); cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center;" onmouseover="this.style.background='#f1f5f9';this.style.color='#0f172a'" onmouseout="this.style.background='transparent';this.style.color='#64748b'">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+                </button>
+                <a href="menu.html" class="btn btn-outline" style="padding: 8px 16px; text-decoration: none;">
+                    Volver al Menú
+                </a>
+            </div>
         </div>
 
-        <div class="controls">
-            <div class="control-group">
-                <label>Categoría</label>
-                <div style="display:flex; gap:5px; width:100%">
-                    <select id="categoriaSel" style="flex:1">
-                        <option value="todas" selected>Todas</option>
-                        <option value="agotados">⚠️ Agotados (Stock 0)</option>
-                        <option value="vidrio">Vidrio</option>
-                        <option value="aluminio">Aluminio</option>
-                        <option value="herrajes">Herrajes</option>
-                        <option value="insumos">Insumos</option>
-                    </select>
-                    <button id="btnRefresh" class="btn btn-outline" title="Actualizar datos" style="padding:0 10px; font-size:1.2rem; height: 38px;">↻</button>
+        <!-- Admin Panel moved to top -->
+        <div id="adminPanel" class="admin-panel hidden">
+            <div class="admin-header">
+                <h3>👑 Panel Administrador</h3>
+                <button id="btnCloseAdmin" class="admin-btn-secondary" style="border:none; background:transparent; font-size:1.5rem; padding:0; line-height:1;">&times;</button>
+            </div>
+            
+            <div class="admin-content">
+                <!-- Admin Navigation -->
+                <div class="admin-nav">
+                    <button id="btnAdminUsers" class="admin-tab-btn active" onclick="showAdminTab('users')">Usuarios</button>
+                    <button id="btnAdminLog" class="admin-tab-btn" onclick="showAdminTab('log')">Bitácora</button>
+                </div>
+
+                <!-- Users View -->
+                <div id="adminUsersView">
+                    <div class="admin-toolbar">
+                        <h4>Gestión de Usuarios</h4>
+                        <button onclick="actualizarUsuariosAdmin()" class="admin-btn-secondary" title="Recargar">🔄 Recargar</button>
+                    </div>
+                    <div class="admin-table-responsive">
+                        <table id="tablaUsuariosAdmin" class="admin-table"><thead><tr><th>Usuario</th><th>Estado</th><th>Acción</th></tr></thead><tbody></tbody></table>
+                    </div>
+                </div>
+
+                <!-- Log View -->
+                <div id="adminLogView" class="hidden">
+                    <div class="admin-toolbar">
+                        <h4>Bitácora de Movimientos</h4>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <input id="searchLog" placeholder="Buscar..." style="padding: 5px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; width: 150px;">
+                            <button onclick="actualizarLogAdmin()" class="admin-btn-secondary" title="Recargar">🔄</button>
+                            <button id="exportLogCSV" class="admin-btn-secondary" style="color:#b45309; border-color:#fcd34d;">📄 CSV</button>
+                        </div>
+                    </div>
+                    <div class="admin-table-responsive">
+                        <table id="tablaLogAdmin" class="admin-table"><thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Detalles</th></tr></thead><tbody></tbody></table>
+                    </div>
                 </div>
             </div>
-            <div class="control-group">
-                <label>Buscar</label>
-                <input id="busqueda" placeholder="Escribe para buscar...">
+        </div>
+
+        <!-- WORKSPACE MODE SWITCHER (New) -->
+        <div class="mode-switcher">
+            <button id="modeInv" class="mode-btn active" onclick="setAppMode('inventario')">
+                📦 Inventario Comercial
+            </button>
+            <button id="modeEquipo" class="mode-btn" onclick="setAppMode('equipo')">
+                🛠️ Equipo de Trabajo
+            </button>
+        </div>
+
+        <div class="card-panel controls" style="display:block;">
+            <div class="controls-grid">
+                <div class="control-group">
+                    <label>Categoría</label>
+                    <div style="display:flex; gap:5px; width:100%">
+                        <select id="categoriaSel" style="flex:1">
+                            <option value="todas" selected>Todas</option>
+                            <option value="agotados">⚠️ Agotados (Stock 0)</option>
+                            <option value="vidrio">Vidrio</option>
+                            <option value="aluminio">Aluminio</option>
+                            <option value="herrajes">Herrajes</option>
+                            <option value="insumos">Insumos</option>
+                        </select>
+                        <button id="btnRefresh" class="btn btn-outline" title="Actualizar datos" style="padding:0 10px; font-size:1.2rem; height: 42px;">↻</button>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>Buscar</label>
+                    <input id="busqueda" placeholder="Escribe para buscar...">
+                </div>
             </div>
+            
+            <!-- Vidrio specific controls (Hidden by default) -->
+            <div id="vidrioControls" class="control-group" style="display:none; flex-direction:column; gap:8px; margin-top:20px;">
+                <div class="controls-grid">
+                    <div style="width:100%">
+                        <label style="font-size:0.8rem; font-weight:bold; color:var(--text-light);">Tipo Vidrio</label>
+                        <select id="vidrioTipoFilter" style="width:100%;"><option value="">Todos</option></select>
+                    </div>
+                    <div style="width:100%">
+                        <label style="font-size:0.8rem; font-weight:bold; color:var(--text-light);">Medidas (Min)</label>
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <input id="vidrioMedida1Filter" type="number" step="0.1" placeholder="Lado A" style="flex:1;">
+                            <span style="color:var(--text-light);">x</span>
+                            <input id="vidrioMedida2Filter" type="number" step="0.1" placeholder="Lado B" style="flex:1;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Filter by field removed as requested -->
             
-            <div class="action-buttons">
-                <button id="btnCameraScan" class="btn-pro btn-pro-primary">
+            <div class="action-buttons" style="display:flex; gap:12px; margin-top:24px; flex-wrap:wrap;">
+                <button id="btnCameraScan" class="btn btn-primary" style="flex:1; justify-content:center;">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
                     Escáner
                 </button>
-                <button id="btnNew" class="btn-pro btn-pro-outline">
+                <button id="btnNew" class="btn btn-outline" style="flex:1; justify-content:center;">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                     Nuevo
                 </button>
-                <button id="btnAdvancedSearch" class="btn-pro btn-pro-outline">
+                <button id="btnAdvancedSearch" class="btn btn-outline" style="flex:1; justify-content:center;">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
                     Filtros
+                </button>
+                <button onclick="window.location.href='menu.html'" class="btn btn-outline" style="flex:1; justify-content:center;">
+                     Volver
                 </button>
             </div>
         </div>
@@ -132,6 +635,22 @@
             <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
                 <button id="cancelSearch" class="btn btn-outline">Cancelar</button>
                 <button id="applySearch" class="btn btn-primary">Aplicar filtros</button>
+            </div>
+        </div>
+
+        <!-- NEW: Generic Choice Modal (Replacement for Prompts/Confirms) -->
+        <div id="genericModal" class="modal hidden">
+            <h3 id="genericTitle">Título</h3>
+            <div id="genericContent" style="margin-bottom:15px; color:#475569;">
+                <!-- Content here (Text, HTML or Inputs) -->
+            </div>
+            <div id="genericInputs" style="margin-bottom:15px; display:none;">
+                <!-- Optional inputs injected here -->
+            </div>
+            
+            <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
+                <button id="genericCancel" class="btn btn-outline">Cancelar</button>
+                <button id="genericConfirm" class="btn btn-primary">Aceptar</button>
             </div>
         </div>
 
@@ -173,6 +692,11 @@
                         <input type="number" id="scanQty" value="1" min="1" class="scanner-qty-input">
                         <button type="button" onclick="document.getElementById('scanQty').stepUp()" style="width:32px;height:32px;border:1px solid #cbd5e1;background:#fff;border-radius:4px;cursor:pointer;">+</button>
                     </div>
+
+                    <!-- Comment Field for Scanner -->
+                    <div style="margin-bottom:12px;">
+                        <input type="text" id="scanComment" placeholder="Comentario (opcional)" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.9rem;">
+                    </div>
                     
                     <div class="scanner-btn-group">
                         <button id="btnScanEntry" class="btn btn-entry btn-scan-action">
@@ -193,26 +717,14 @@
             </div>
         </div>
 
-        <div id="adminPanel" class="container hidden admin-panel">
-            <h3>👑 Panel Administrador</h3>
-            <div style="display:flex;gap:20px;flex-wrap:wrap">
-                <div style="flex:1;min-width:280px">
-                    <h4 style="margin-top:0">Usuarios</h4>
-                    <table id="tablaUsuariosAdmin"><thead><tr><th>Usuario</th><th>Estado</th><th>Acción</th></tr></thead><tbody></tbody></table>
-                </div>
-                <div style="flex:1;min-width:280px">
-                    <h4 style="margin-top:0">Bitácora</h4>
-                    <button id="exportLogCSV" class="btn btn-outline" style="margin-bottom:10px;font-size:0.8rem;color:#b45309;border-color:#fcd34d;background:#fff">Exportar CSV</button>
-                    <table id="tablaLogAdmin"><thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th></tr></thead><tbody></tbody></table>
-                </div>
-            </div>
-        </div>
+        <!-- Admin Panel removed from here -->
+
     </div>
 
     <script>
     // --- Data load ---
     const usuarioActivoEl = document.getElementById('usuarioActivo');
-    const btnLogout = document.getElementById('btnLogout');
+    // const btnLogout = document.getElementById('btnLogout');
     const categoriaSel = document.getElementById('categoriaSel');
     const busqueda = document.getElementById('busqueda');
     const formArea = document.getElementById('formArea');
@@ -224,8 +736,81 @@
     const applySearchBtn = document.getElementById('applySearch');
     const cancelSearchBtn = document.getElementById('cancelSearch');
     const adminPanel = document.getElementById('adminPanel');
+    const btnToggleAdmin = document.getElementById('btnToggleAdmin');
+    const btnCloseAdmin = document.getElementById('btnCloseAdmin');
     const loadingOverlay = document.getElementById('loadingOverlay');
     const loadingText = document.getElementById('loadingText');
+
+    // --- Notifications logic ---
+    const notificationContainer = document.getElementById('notification-container');
+
+    function showNotification(message, type = 'info', title = null) {
+        if(!notificationContainer) return;
+        
+        const notif = document.createElement('div');
+        notif.className = `notification ${type}`;
+        
+        let icon = 'ℹ️';
+        if(type === 'success') icon = '✅';
+        if(type === 'error') icon = '❌';
+        if(type === 'warning') icon = '⚠️';
+        
+        const safeTitle = title ? title : (type === 'error' ? 'Error' : (type === 'success' ? 'Éxito' : 'Información'));
+        
+        notif.innerHTML = `
+            <div style="font-size: 1.5rem;">${icon}</div>
+            <div class="notification-content">
+                <div class="notification-title">${safeTitle}</div>
+                <div class="notification-message">${message}</div>
+            </div>
+            <button class="notification-close" onclick="this.parentElement.remove()">&times;</button>
+        `;
+        
+        notificationContainer.appendChild(notif);
+        
+        // Auto remove after 5 seconds, unless it's an error
+        if(type !== 'error'){
+            setTimeout(() => {
+                notif.style.animation = 'fadeOut 0.3s ease-out forwards';
+                setTimeout(() => notif.remove(), 300);
+            }, 5000);
+        } else {
+             // Errors last longer or until dismissed
+             setTimeout(() => {
+                notif.style.animation = 'fadeOut 0.3s ease-out forwards';
+                setTimeout(() => notif.remove(), 300);
+            }, 10000);
+        }
+    }
+
+    // Override default alert
+    window.alert = function(msg) {
+        showNotification(msg, 'warning', 'Alerta');
+    };
+
+    // Intercept Console Errors
+    const originalConsoleError = console.error;
+    console.error = function(...args) {
+        originalConsoleError.apply(console, args);
+        // Join args for display
+        const msg = args.map(a => {
+            if (a instanceof Error) return a.message;
+            if (typeof a === 'object') return JSON.stringify(a);
+            return String(a);
+        }).join(' ');
+        showNotification(msg, 'error', 'Error de Consola');
+    };
+
+    // Global Error Handler
+    window.onerror = function(message, source, lineno, colno, error) {
+        showNotification(`${message}`, 'error', 'Error del Sistema');
+        return false; 
+    };
+
+    // Promise Rejection Handler
+    window.onunhandledrejection = function(event) {
+        showNotification(`${event.reason}`, 'error', 'Error Async');
+    };
 
     let loadingCounter = 0;
     let isSyncing = false; // Global flag for background sync state
@@ -280,14 +865,27 @@
     // ensure a sane default category to avoid rendering nothing
     if(categoriaSel && !categoriaSel.value) categoriaSel.value = 'todas';
 
-    let inventory = {vidrio:[],aluminio:[],herrajes:[],insumos:[]};
+    let inventory = {vidrio:[],aluminio:[],herrajes:[],insumos:[],andamiaje:[]};
     // Try to load from local storage for instant render
     try {
         const saved = localStorage.getItem('inventory_v1');
         if(saved) {
             const parsed = JSON.parse(saved);
-            inventory = { ...inventory, ...parsed };
-            console.log('Loaded inventory from local storage');
+            // Normalize keys to lowercase to ensure matching with templates
+            const normalized = {};
+            Object.keys(parsed).forEach(k => normalized[k.toLowerCase()] = parsed[k]);
+            
+            inventory = { ...inventory, ...normalized };
+            console.log('Loaded inventory from local storage. Keys:', Object.keys(normalized));
+            
+            // Patch legacy items from local storage that might be missing 'lugar'
+            Object.keys(inventory).forEach(cat => {
+                if(Array.isArray(inventory[cat])){
+                    inventory[cat].forEach(it => {
+                        if(it && !it.lugar) it.lugar = 'Bodega';
+                    });
+                }
+            });
         }
     } catch(e) { console.warn('Error loading local inventory', e); }
 
@@ -303,16 +901,17 @@
         });
     }
     // Apps Script Web App exec URL (direct). Replace with your deployment URL if different.
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycbwRpRM_SnH7p0_2DS4T4HHKjYuQnUpYVBZgqyr5-KSPVrr79UpUdtMDHfln4HVUlu73WA/exec';
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbz9ar2-nOzV2D433ttCRx7qiKckG8dGGsHH-VV2x_aa-_oicE_WLdmvotPbRVAPmqbC4Q/exec';
     // Mapear categoría UI -> id de inventario en Apps Script (ajusta según tu configuración)
-    const CATEGORY_TO_INVENTORY = { aluminio: '1', herrajes: '2', vidrio: '3', insumos: '4' };
+    const CATEGORY_TO_INVENTORY = { aluminio: '1', herrajes: '2', vidrio: '3', insumos: '4', andamiaje: '5' };
 
     // Templates (campos por categoría)
     const templates = {
-        vidrio: ['image','tipo','color','grosor','forma','medida1','medida2','cantidad'],
-        aluminio: ['image','linea','serie','nombre','color','codigo','cantidad'],
-        herrajes: ['image','nombre','color','codigo','cantidad'],
-        insumos: ['image','nombre','tipo','color','codigo','cantidad']
+        vidrio: ['image','codigo','tipo','color','grosor','forma','medida1','medida2','lugar','cantidad','comentarios'],
+        aluminio: ['image','linea','serie','nombre','color','codigo','lugar','cantidad','comentarios'],
+        herrajes: ['image','nombre','color','codigo','lugar','cantidad','comentarios'],
+        insumos: ['image','nombre','tipo','color','codigo','lugar','cantidad','comentarios'],
+        andamiaje: ['image','codigo','tipo','subtipo','altura','lugar','cantidad','total','comentarios']
     };
 
     // Sync categories from this frontend templates -> Apps Script
@@ -366,14 +965,44 @@
         item.nombre = pick('nombre','name','linea','tipo','forma');
         item.codigo = pick('codigo','sku','serie','tipo','forma','id','referencia');
         item.cantidad = parseInt(pick('quantity','cantidad','qty','stock','existencia') || 0) || 0;
+        item.lugar = pick('lugar','ubicacion','location','sitio','estante','pasillo') || 'Bodega'; // Explicit lugar
         item.notes = r.notes || '';
-        item.imageUrl = pick('imageUrl','image','imagen','url','foto');
+        // Custom helper to find first non-empty value
+        const pickNotEmpty = (...keys)=>{ 
+            for(const k of keys){ 
+                const val = pick(k);
+                if(val && String(val).trim() !== '') return val;
+            } 
+            return ''; 
+        };
+
+        item.imageUrl = pickNotEmpty('imageUrl','image','imagen','url','foto','imagedata','imageData','Imagedata');
         
         // Specific field mapping for known categories to ensure they are populated
         if(cat === 'vidrio'){
             item.medida1 = pick('medida1','ancho','width','base');
             item.medida2 = pick('medida2','alto','largo','height','length','altura');
             item.grosor = pick('grosor','thickness','calibre','espesor','mm');
+            
+            // Fallback: parse 'medida' string if discrete cols missing
+            if((!item.medida1 || !item.medida2)){
+                 const mVal = (item.medida || pick('medida','size') || '').toString();
+                 if(mVal){
+                     const parts = mVal.split(/x|×|\*|,|;/i).map(s=>s.trim()).filter(Boolean);
+                     if(parts.length > 0){
+                         if(!item.medida1) item.medida1 = parts[0];
+                         if(parts.length > 1 && !item.medida2) item.medida2 = parts[1];
+                     }
+                 }
+            }
+        }
+
+        if(cat === 'andamiaje'){
+            item.subtipo = pick('subtipo','subtype');
+            item.altura = pick('altura','height','alto');
+            item.adicionales = parseInt(pick('adicionales','extra','agregados') || 0) || 0;
+            // Total = Base (cantidad) + Adicionales
+            item.total = item.cantidad + item.adicionales;
         }
         
         // hydrate template fields if missing
@@ -435,11 +1064,14 @@
     }
 
     // Optimized: Load single item from server (Safety Check)
-    async function loadItemRemote(cat, sku){
+    async function loadItemRemote(cat, sku, lugar=null){
         try{
             const invId = CATEGORY_TO_INVENTORY[cat];
             if(!invId) return null;
-            const url = GAS_URL + '?action=get&inventory=' + encodeURIComponent(invId) + '&sku=' + encodeURIComponent(sku);
+            let url = GAS_URL + '?action=get&inventory=' + encodeURIComponent(invId) + '&sku=' + encodeURIComponent(sku);
+            // Append lookupLugar if provided to target specific row
+            if(lugar !== null && lugar !== undefined) url += '&lookupLugar=' + encodeURIComponent(lugar);
+
             const j = await jsonpFetch(url);
             if(j && j.ok && j.row){
                 return processRow(j.row, cat);
@@ -452,7 +1084,7 @@
     }
 
     // Update quantity on Sheets by sku (uses action=update)
-    async function updateQuantityRemote(cat, item, newQty){
+    async function updateQuantityRemote(cat, item, newQty, comment = '', lookupLugar = null){
         setLoading(true, 'Actualizando cantidad...', false); // Non-blocking update
         try{
             const invId = CATEGORY_TO_INVENTORY[cat];
@@ -463,23 +1095,123 @@
 
             // use JSONP GET-based update (Apps Script supports GET update when called this way)
             const user = localStorage.getItem('activo') || 'Anonimo';
-            const actionDetails = `Cambio de stock: ${item.nombre || item.sku} a ${newQty}`;
-            const url = GAS_URL + '?action=update&inventory=' + encodeURIComponent(invId) + '&sku=' + encodeURIComponent(skuVal) + '&quantity=' + encodeURIComponent(String(newQty)) + '&user=' + encodeURIComponent(user) + '&actionDetails=' + encodeURIComponent(actionDetails);
+            let actionDetails = `Cambio de stock: ${item.nombre || item.sku} a ${newQty}`;
+            if(comment) actionDetails += ` | Nota: ${comment}`;
             
+            let url = GAS_URL + '?action=update&inventory=' + encodeURIComponent(invId) + '&sku=' + encodeURIComponent(skuVal) + '&quantity=' + encodeURIComponent(String(newQty)) + '&user=' + encodeURIComponent(user) + '&actionDetails=' + encodeURIComponent(actionDetails);
+            
+            if(lookupLugar !== null && lookupLugar !== undefined) url += '&lookupLugar=' + encodeURIComponent(lookupLugar);
+
             console.log('Updating remote:', url);
             const j = await jsonpFetch(url);
             
             if(j && j.ok){
                 console.log('Update success:', j);
-                // Optimization: Do NOT reload whole category. We update local state in caller.
-                // try{ await loadInventoryForCategory(cat); }catch(e){ console.warn('Reload after update failed',e); }
-                return true;
+                // Return full response so caller can check for 'deleted' flag
+                return j; 
             }
             throw new Error((j && j.error) ? j.error : 'Update failed (unknown error)');
         }catch(err){ 
             console.error('updateQuantityRemote failed',err); 
             alert('Error al actualizar cantidad: ' + err.message);
             throw err; 
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    // Generic item update (for any field)
+    async function updateItemRemote(cat, item, updates, comment = '', lookupLugar = null){
+        setLoading(true, 'Actualizando...', false);
+        try{
+            const invId = CATEGORY_TO_INVENTORY[cat];
+            const skuVal = item.codigo || item.sku || item.nombre;
+            if(!invId || !skuVal) throw new Error('Missing ID or SKU');
+            
+            const user = localStorage.getItem('activo') || 'Anonimo';
+            let actionDetails = comment || 'Actualización manual';
+            
+            // Build URL
+            let url = GAS_URL + '?action=update&inventory=' + encodeURIComponent(invId) + '&sku=' + encodeURIComponent(skuVal) + '&user=' + encodeURIComponent(user) + '&actionDetails=' + encodeURIComponent(actionDetails);
+            
+            // Use lookupLugar if provided to target specific row
+            if(lookupLugar !== null && lookupLugar !== undefined) url += '&lookupLugar=' + encodeURIComponent(lookupLugar);
+
+            // Append updates
+            Object.keys(updates).forEach(k => {
+                url += '&' + k + '=' + encodeURIComponent(String(updates[k]));
+            });
+            
+            const j = await jsonpFetch(url);
+            if(j && j.ok) return j;
+            throw new Error((j && j.error) ? j.error : 'Update failed');
+        }catch(err){
+            console.error(err);
+            throw err;
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    // Create item remote
+    async function createItemRemote(cat, itemData){
+        setLoading(true, 'Creando item...', false);
+        try{
+            const invId = CATEGORY_TO_INVENTORY[cat];
+            if(!invId) throw new Error('Inventory id not mapped for '+cat);
+            
+            const user = localStorage.getItem('activo') || 'Anonimo';
+            
+            // Switch to POST to support Base64 images and large payloads
+            const payload = {
+                action: 'create',
+                inventory: invId,
+                user: user,
+                actionDetails: 'Clonado/Creación de ' + (itemData.nombre||itemData.sku)
+            };
+            
+            // Merge itemData
+            Object.keys(itemData).forEach(k => {
+                 if(k!=='id' && k!=='row' && k!=='timestamp' && k!=='inventoryId' && k!=='action' && k!=='inventory' && k!=='user') payload[k] = itemData[k];
+            });
+            
+            // Handle Base64 Image Logic
+            let imgData = payload.image || payload.imageUrl;
+            if(imgData && String(imgData).startsWith('data:image')){
+                const parts = String(imgData).split(',');
+                if(parts.length > 1){
+                    payload.imageBase64 = parts[1]; // Pure Base64
+                    const match = String(imgData).match(/:(.*?);/);
+                    if(match) payload.imageMime = match[1];
+                } else {
+                    payload.imageBase64 = imgData;
+                }
+                // Clear the raw image/imageUrl fields to avoid sending redundant huge data
+                delete payload.image;
+                delete payload.imageUrl;
+            }
+
+            // Build Body
+            const body = new URLSearchParams();
+            Object.keys(payload).forEach(k => {
+                let val = payload[k];
+                if(val === null || val === undefined) return;
+                if(typeof val === 'object') val = JSON.stringify(val);
+                body.append(k, val);
+            });
+
+            console.log('Creating remote via POST');
+            const resp = await fetch(GAS_URL, {
+                method: 'POST',
+                body: body
+            });
+            const j = await resp.json();
+            
+            if(j && j.ok) return j;
+             throw new Error((j && j.error) ? j.error : 'Create failed');
+        }catch(err){
+            console.error('createItemRemote failed', err);
+            throw err;
         } finally {
             setLoading(false);
         }
@@ -502,6 +1234,43 @@
     // helper: all categories list
     const allCategories = Object.keys(templates);
 
+    // --- App Mode Logic (Inventario vs Equipo) ---
+    let currentAppMode = 'inventario';
+    
+    function setAppMode(mode){
+        currentAppMode = mode;
+        const btnInv = document.getElementById('modeInv');
+        const btnEq = document.getElementById('modeEquipo');
+        const sel = document.getElementById('categoriaSel');
+        
+        // Update tabs UI
+        if(mode === 'equipo'){
+            if(btnInv) btnInv.classList.remove('active');
+            if(btnEq) btnEq.classList.add('active');
+            
+            // Rewrite Selector
+            sel.innerHTML = `<option value="andamiaje" selected>Andamiaje y Escaleras</option>`;
+            sel.value = 'andamiaje';
+        } else {
+            if(btnInv) btnInv.classList.add('active');
+            if(btnEq) btnEq.classList.remove('active');
+            
+            // Rewrite Selector to Default
+            sel.innerHTML = `
+                <option value="todas" selected>Todas</option>
+                <option value="agotados">⚠️ Agotados (Stock 0)</option>
+                <option value="vidrio">Vidrio</option>
+                <option value="aluminio">Aluminio</option>
+                <option value="herrajes">Herrajes</option>
+                <option value="insumos">Insumos</option>
+            `;
+            sel.value = 'todas';
+        }
+        
+        // Trigger change to refresh view
+        sel.dispatchEvent(new Event('change'));
+    }
+
     // Populate filterField options based on selected category (or all)
     const filterField = document.getElementById('filterField');
     function populateFilterOptions(selectedCat){
@@ -522,10 +1291,51 @@
         });
     }
 
+    // --- Vidrio Filter Logic ---
+    function populateVidrioTypes(){
+        const sel = document.getElementById('vidrioTipoFilter');
+        if(!sel) return;
+        const current = sel.value;
+        const items = inventory['vidrio'] || []; 
+        const types = new Set();
+        items.forEach(it => {
+            const t = (it.tipo || '').toString().trim();
+            if(t) types.add(t);
+        });
+        
+        sel.innerHTML = '<option value="">Todos</option>';
+        Array.from(types).sort().forEach(t => {
+            const op = document.createElement('option');
+            op.value = t;
+            op.innerText = t;
+            sel.appendChild(op);
+        });
+        sel.value = current;
+    }
+
+    const vT = document.getElementById('vidrioTipoFilter');
+    const vM1 = document.getElementById('vidrioMedida1Filter');
+    const vM2 = document.getElementById('vidrioMedida2Filter');
+    if(vT) vT.addEventListener('change', () => renderTable(categoriaSel.value, busqueda.value));
+    if(vM1) vM1.addEventListener('input', () => renderTable(categoriaSel.value, busqueda.value));
+    if(vM2) vM2.addEventListener('input', () => renderTable(categoriaSel.value, busqueda.value));
+
     // --- Minimal app state helpers (define commonly used globals) ---
     const activo = localStorage.getItem('activo') || null;
-    let usuarios = JSON.parse(localStorage.getItem('usuarios_v1') || '{}');
+    const activeRole = localStorage.getItem('rol') || 'visor'; // Default to visor
+    // Removed local usuarios object in favor of Server Action
     let log = JSON.parse(localStorage.getItem('log_v1') || '[]');
+
+    function applyRolePermissions(){
+        document.body.classList.remove('role-visor','role-editor','role-admin');
+        if(activeRole === 'administrador') {
+            document.body.classList.add('role-admin');
+        } else if(activeRole === 'editor') {
+            document.body.classList.add('role-editor');
+        } else {
+            document.body.classList.add('role-visor');
+        }
+    }
 
     function saveInventory(){
         try{
@@ -543,10 +1353,20 @@
             localStorage.setItem('inventory_v1', JSON.stringify(safeCopy));
         }catch(e){ console.warn('saveInventory failed',e); }
     }
-    function saveUsers(){ try{ localStorage.setItem('usuarios_v1', JSON.stringify(usuarios)); }catch(e){ console.warn('saveUsers failed',e); } }
+    function saveUsers(){ /* Deprecated: Users managed by GAS */ }
     function saveLog(){ try{ localStorage.setItem('log_v1', JSON.stringify(log)); }catch(e){ console.warn('saveLog failed',e); } }
 
     function makeId(){ return 'id_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8); }
+    
+    function generateNumericId(length = 8) {
+        // Simple numeric ID generation
+        let result = '';
+        const characters = '0123456789';
+        for (let i = 0; i < length; i++) {
+            result += characters.charAt(Math.floor(Math.random() * characters.length));
+        }
+        return result;
+    }
 
     // --- Advanced search UI ---
     function openAdvancedSearch(){
@@ -651,7 +1471,10 @@
             const h = document.createElement('h3'); h.innerText = c.toUpperCase(); cont.appendChild(h);
             const tbl = document.createElement('table');
             const thead = document.createElement('thead'); const hr = document.createElement('tr');
-            templates[c].forEach(col=>{ const th=document.createElement('th'); th.innerText=col.toUpperCase(); hr.appendChild(th); });
+            templates[c].forEach(col=>{ 
+                if(col === 'comentarios') return;
+                const th=document.createElement('th'); th.innerText=col.toUpperCase(); hr.appendChild(th); 
+            });
             const tha = document.createElement('th'); tha.innerText='ACCIONES'; hr.appendChild(tha); thead.appendChild(hr); tbl.appendChild(thead);
             const tbody = document.createElement('tbody');
             (inventory[c]||[]).forEach(item=>{
@@ -665,18 +1488,117 @@
                     if(!ok) return;
                     const tr = document.createElement('tr');
                     templates[c].forEach(key=>{
+                        if(key === 'comentarios') return;
                         const td = document.createElement('td');
                         if(key==='image'){
                             const src = item.imageUrl || item.imageData;
                             if(src){ const img=document.createElement('img'); img.src=src; img.style.height='40px'; td.appendChild(img); }
                             else if(item.imageName) td.innerText = item.imageName; else td.innerText = '-';
+                        } else if(key==='lugar'){
+                            // Highlight different warehouses
+                            td.innerText = item[key] || '';
+                            td.style.fontWeight = 'bold';
+                            td.style.color = '#2563eb';
                         } else td.innerText = item[key] || '';
                         tr.appendChild(td);
                     });
                     const tdA = document.createElement('td'); tdA.className='actions';
-                    const inBtn = document.createElement('button'); inBtn.innerText='Entrada'; inBtn.addEventListener('click', async ()=>{ try{ const q=parseInt(prompt('Cantidad a agregar')||0); if(!q) return; const newQty = (parseInt(item.cantidad)||0) + q; await updateQuantityRemote(c, item, newQty); item.cantidad = newQty; renderTableWithCriteria(criteria); }catch(e){ console.error('Entrada error',e); alert('Error en entrada (ver consola) - '+(e.message||e)); } });
-                    const outBtn = document.createElement('button'); outBtn.innerText='Salida'; outBtn.addEventListener('click', async ()=>{ try{ const q=parseInt(prompt('Cantidad a retirar')||0); if(!q) return; if((item.cantidad||0) < q) return alert('Stock insuficiente'); const newQty = (parseInt(item.cantidad)||0) - q; await updateQuantityRemote(c, item, newQty); item.cantidad = newQty; renderTableWithCriteria(criteria); }catch(e){ console.error('Salida error',e); alert('Error en salida (ver consola) - '+(e.message||e)); } });
-                    const delBtn = document.createElement('button'); delBtn.innerText='Eliminar'; delBtn.className='btn-delete'; delBtn.addEventListener('click', ()=>{ try{ if(!confirm('Eliminar producto?')) return; inventory[c]=inventory[c].filter(x=>x.id!==item.id); saveInventory(); renderTableWithCriteria(criteria); }catch(e){ console.error('Eliminar error',e); alert('Error al eliminar (ver consola)'); } });
+                    const inBtn = document.createElement('button'); inBtn.innerText='Entrada'; inBtn.addEventListener('click', async ()=>{ 
+                        try{ 
+                             // Show input modal for Quantity
+                             const res = await showGenericModal({
+                                 title: 'Entrada de Mercancia',
+                                 message: `Agregar existencias para: <b>${item.nombre || item.codigo}</b><br>Ubicación actual: <b>${item.lugar || 'Desconocida'}</b>`,
+                                 inputs: [{label:'Cantidad a agregar:', type:'number', value:'1'}],
+                                 confirmText: 'Agregar',
+                                 cancelText: 'Cancelar'
+                             }); 
+                             
+                             if(!res.confirmed) return;
+                             
+                             const q = parseInt(res.values ? res.values['inp_0'] : 0) || (res.values && Object.values(res.values)[0]); 
+                             if(!q) return;
+
+                             const newQty = (parseInt(item.cantidad)||0) + parseInt(q); 
+                             
+                             // Pass 'lugar' to updateQuantityRemote so it knows exactly which row to update
+                             await updateQuantityRemote(c, item, newQty, '', item.lugar); 
+                             
+                             item.cantidad = newQty; 
+                             renderTableWithCriteria(criteria); 
+                             await showGenericModal({title:'Éxito', message:'Stock actualizado correctamente.', confirmText:'OK'});
+                        }catch(e){ 
+                             console.error('Entrada error',e); 
+                             await showGenericModal({title:'Error', message:'Error en entrada: '+ (e.message||e), confirmText:'Cerrar'});
+                        } 
+                    });
+
+                    const outBtn = document.createElement('button'); outBtn.innerText='Salida'; outBtn.addEventListener('click', async ()=>{ 
+                        try{ 
+                             const res = await showGenericModal({
+                                 title: 'Salida de Mercancia',
+                                 message: `Retirar existencias de: <b>${item.nombre || item.codigo}</b><br>Ubicación: <b>${item.lugar || 'Desconocida'}</b><br>Stock actual: ${item.cantidad}`,
+                                 inputs: [{label:'Cantidad a retirar:', type:'number', value:'1'}],
+                                 confirmText: 'Retirar',
+                                 cancelText: 'Cancelar'
+                             });
+                             
+                             if(!res.confirmed) return;
+
+                             const q = parseInt(res.values ? res.values['inp_0'] : 0) || (res.values && Object.values(res.values)[0]);
+                             if(!q) return;
+                             if((item.cantidad||0) < q) {
+                                  await showGenericModal({title:'Error', message:'Stock insuficiente en esta ubicación.', confirmText:'Entendido'});
+                                  return;
+                             }
+                             
+                             const newQty = (parseInt(item.cantidad)||0) - parseInt(q); 
+                             
+                             // Pass 'lugar' to updateQuantityRemote logic
+                             await updateQuantityRemote(c, item, newQty, '', item.lugar); 
+                             
+                             item.cantidad = newQty; 
+                             renderTableWithCriteria(criteria); 
+                             await showGenericModal({title:'Éxito', message:'Salida registrada correctamente.', confirmText:'OK'});
+                        }catch(e){ 
+                             console.error('Salida error',e); 
+                             await showGenericModal({title:'Error', message:'Error en salida: '+(e.message||e), confirmText:'Cerrar'});
+                        } 
+                    });
+
+                    const delBtn = document.createElement('button'); delBtn.innerText='Eliminar'; delBtn.className='btn-delete'; delBtn.addEventListener('click', async ()=>{ 
+                         try{ 
+                             const conf = await showGenericModal({
+                                 title: 'Confirmar Eliminación',
+                                 message: `¿Está seguro de eliminar este producto?<br><b>${item.nombre}</b><br>Ubicación: ${item.lugar}<br>Esta acción no se puede deshacer.`,
+                                 confirmText: 'Eliminar',
+                                 cancelText: 'Cancelar'
+                             });
+                             if(!conf.confirmed) return;
+                             
+                             // To delete, we can treat it as a special update or handled by backend logic (e.g. qty 0 ?). 
+                             // Specifically for Vidrio/Andamiaje logic in backend deletes if qty <= 0.
+                             // But for explicit delete button, we might need a delete action or set qty 0.
+                             // Let's set qty to 0 which backend handles as delete for Vidrio/Andamiaje, or implement specific delete.
+                             // Currently backend deletes if name=Vidrio|Andamiaje && qty<=0.
+                             // For others, set qty 0 is safest "soft" delete or we need explicit delete endpoint.
+                             // Assuming setting qty 0 triggers delete effectively for now or user wants explicit remove.
+                             // Let's force stock 0 update which might trigger delete in backend logic for certain sheets, 
+                             // OR we update local array and save if offline.
+                             
+                             // Actually, let's just use updateQuantityRemote to 0. Backend logic handles delete for Vidrio.
+                             // For others, it just sets stock to 0.
+                             await updateQuantityRemote(c, item, 0, 'Eliminación manual', item.lugar);
+                             
+                             inventory[c]=inventory[c].filter(x=>x !== item); 
+                             saveInventory(); 
+                             renderTableWithCriteria(criteria);
+                             
+                         }catch(e){ 
+                             console.error('Eliminar error',e); 
+                             await showGenericModal({title:'Error', message:'Error al eliminar: '+e.message, confirmText:'Cerrar'});
+                         } 
+                    });
                     tdA.appendChild(inBtn); tdA.appendChild(outBtn); tdA.appendChild(delBtn); tr.appendChild(tdA);
                     tbody.appendChild(tr);
                 }catch(err){ console.error('Error renderTableWithCriteria item',item,err); }
@@ -734,6 +1656,20 @@
                 const inp = document.createElement('input'); inp.type='file'; inp.accept='image/*'; col.appendChild(inp); inputs[k]=inp;
             } else if(k==='cantidad'){
                 const inp = document.createElement('input'); inp.type='number'; inp.min='0'; inp.value=prefillData[k] || '0'; col.appendChild(inp); inputs[k]=inp;
+            } else if(k==='comentarios'){
+                // New specialized field for comments
+                const inp = document.createElement('textarea'); 
+                inp.placeholder = 'Agregar detalles o notas sobre el producto...';
+                inp.rows = 2; // small height
+                inp.style.resize = 'none';
+                inp.style.fontFamily = 'inherit';
+                inp.style.fontSize = '0.9rem';
+                inp.style.padding = '8px';
+                inp.style.border = '1px solid #cbd5e1';
+                inp.style.borderRadius = '6px';
+                inp.style.width = '100%';
+                if(prefillData.notes) inp.value = prefillData.notes;
+                col.appendChild(inp); inputs[k]=inp;
             } else {
                 // create select populated with unique existing values for this field in this category
                 const sel = document.createElement('select'); 
@@ -765,6 +1701,116 @@
             // append column wrapper for every field
             wrapper.appendChild(col);
         });
+        
+        // --- Auto-generate SKU/Code for Vidrio ---
+        if(cat === 'vidrio' && inputs['codigo']){
+             const getFieldVal = (k) => {
+                 const f = inputs[k];
+                 if(!f) return '';
+                 if(f.tagName === 'INPUT') return f.value;
+                 if(f.select){
+                      const raw = f.select.value;
+                      if(raw === '__OTHER__') return f.other.value;
+                      if(raw === '__ANY__') return '';
+                      return raw;
+                 }
+                 return '';
+             };
+             
+             
+             // Auto-generate code based on Glass parameters
+             // format: [TYPE_NUM][COLOR_NUM]-[GROSOR]-[WxH]
+             // Simplifies text to 2-digit numbers
+             const updateGlassCode = () => {
+                 const getVal = (k) => {
+                     if(!inputs[k]) return '';
+                     if(inputs[k].select){
+                         return inputs[k].select.value === '__OTHER__' ? inputs[k].other.value : inputs[k].select.value;
+                     }
+                     return inputs[k].value || '';
+                 };
+
+                 const simplifyToNumber = (str, type) => {
+                     if(!str) return '00';
+                     const s = str.trim().toUpperCase();
+                     
+                     // Predefined Maps for consistency
+                     const TYPE_MAP = {
+                         'CRUDO': '1', 'NORMAL': '1', 'RECOCIDO': '1', 'FLOAT': '1', 'CLARO': '1',
+                         'TEMPLADO': '2', 'TEMP': '2',
+                         'LAMINADO': '3', 'LAM': '3',
+                         'INSULADO': '4', 'DOBLE': '4', 'DUO': '4'
+                     };
+                     const COLOR_MAP = {
+                         'CLARO': '1', 'TRANSPARENTE': '1', 'NATURAL': '1',
+                         'VERDE': '2', 'GREEN': '2', 'TINTEX': '2',
+                         'GRIS': '3', 'HUMO': '3', 'GRAY': '3', 'RAYBAN': '3',
+                         'BRONCE': '4', 'BRONZE': '4',
+                         'AZUL': '5', 'BLUE': '5',
+                         'NEGRO': '6', 'BLACK': '6',
+                         'ESPEJO': '7', 'REFLECTA': '8', 'SATINADO': '9'
+                     };
+                     
+                     const map = type === 'type' ? TYPE_MAP : COLOR_MAP;
+                     
+                     // 1. Exact or partial match in map
+                     for(let k in map){
+                         if(s.includes(k)) return map[k];
+                     }
+                     
+                     // 2. Fallback: Consistent numeric hash (10-99)
+                     let hash = 0;
+                     for(let i=0; i<s.length; i++) hash += s.charCodeAt(i);
+                     return ((hash % 89) + 10).toString(); 
+                 };
+
+                 const typeCode = simplifyToNumber(getVal('tipo'), 'type');
+                 const colorCode = simplifyToNumber(getVal('color'), 'color');
+                 const thick = getVal('grosor').replace(/[^0-9.]/g, '');
+                 
+                 const m1 = getVal('medida1');
+                 const m2 = getVal('medida2');
+                 const dims = (m1 && m2) ? `${m1}x${m2}` : '';
+
+                 // Build Code: Ex. v10016100x120 (Starts with 'v', no hyphens)
+                 let parts = ['v'];
+                 
+                 // Combine Type+Color (e.g., 1020)
+                 if(typeCode !== '00' || colorCode !== '00') parts.push(typeCode + colorCode);
+                 
+                 if(thick) parts.push(thick);
+                 if(dims) parts.push(dims);
+
+                 const finalCode = parts.join('');
+                 
+                 const target = inputs['codigo'];
+                 if(target) {
+                    if(target.select){
+                        target.select.value = '__OTHER__';
+                        target.other.style.display = 'block';
+                        target.other.value = finalCode;
+                    } else {
+                        target.value = finalCode;
+                    }
+                 }
+             };
+             
+             ['tipo','color','grosor','medida1','medida2'].forEach(k => {
+                 if(inputs[k]){
+                     if(inputs[k].select){
+                         inputs[k].select.addEventListener('change', updateGlassCode);
+                         inputs[k].other.addEventListener('input', updateGlassCode);
+                     } else if(inputs[k].tagName === 'INPUT'){
+                         inputs[k].addEventListener('input', updateGlassCode);
+                         inputs[k].addEventListener('change', updateGlassCode);
+                     }
+                 }
+             });
+             
+             // Initial call
+             updateGlassCode();
+        }
+
         formArea.appendChild(wrapper);
 
         const btns = document.createElement('div'); 
@@ -772,21 +1818,28 @@
         
         const cancel = document.createElement('button');
         cancel.innerText = 'Cancelar';
-        cancel.className = 'btn-pro btn-pro-outline';
+        cancel.className = 'btn btn-outline';
         cancel.onclick = () => { formArea.classList.add('hidden'); formArea.innerHTML = ''; };
 
         const save = document.createElement('button'); 
         save.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg> Guardar Producto';
-        save.className='btn-pro btn-pro-primary'; 
+        save.className='btn btn-primary'; 
         save.onclick = async ()=>{
-            setLoading(true, 'Guardando...', true); // Blocking save
+            // Modificación: Loader no bloqueante pero con botones deshabilitados
+            setLoading(true, 'Guardando...', false); 
+            save.disabled = true;
+            const originalBtnContent = save.innerHTML;
+            save.innerHTML = '⏳ Procesando...';
+
             try{
                 const data = {id: makeId()};
                 let pendingFile = false;
 
                 async function finalize(){
                     // Safety Check: Verify duplicates on server before creating
-                    setLoading(true, 'Verificando duplicados...', true);
+                    // Update text only, do not increment counter
+                    if(document.getElementById('loadingText')) document.getElementById('loadingText').innerText = 'Verificando duplicados...';
+                    
                     try {
                         await loadInventoryForCategory(cat);
                     } catch(e) {
@@ -801,14 +1854,39 @@
                     const arr = inventory[cat];
                     let dup = -1;
                     arr.forEach((it,i)=>{
+                        // Helper checks
+                        // IMPORTANT: Include 'lugar' (Location) in uniqueness check.
+                        // If same product is in different location, it is NOT a duplicate row (it's a new row).
+                        // Normalizamos strings para evitar errores de espacios o mayúsculas.
+                        const loc1 = String(it.lugar||'Bodega').trim().toLowerCase();
+                        const loc2 = String(data.lugar||'Bodega').trim().toLowerCase();
+                        const sameLugar = loc1 === loc2;
+                        
+                        if(!sameLugar) return; // Not a duplicate if locations differ
+
+                        const codeMatch = (data.codigo && it.codigo === data.codigo);
+
                         if(cat==='vidrio'){
-                            if(it.tipo===data.tipo && it.color===data.color && it.grosor===data.grosor && it.forma===data.forma && it.medida1===data.medida1 && it.medida2===data.medida2) dup=i;
+                            // Match by Code OR by strict attributes
+                            // Normalize strings for comparison to avoid case-sensitivity issues
+                            const matchAttr = (
+                                String(it.tipo||'').trim().toLowerCase() === String(data.tipo||'').trim().toLowerCase() && 
+                                String(it.color||'').trim().toLowerCase() === String(data.color||'').trim().toLowerCase() && 
+                                String(it.grosor||'').trim().toLowerCase() === String(data.grosor||'').trim().toLowerCase() && 
+                                String(it.forma||'').trim().toLowerCase() === String(data.forma||'').trim().toLowerCase() && 
+                                String(it.medida1||'').trim().toLowerCase() === String(data.medida1||'').trim().toLowerCase() && 
+                                String(it.medida2||'').trim().toLowerCase() === String(data.medida2||'').trim().toLowerCase()
+                            );
+                            if(codeMatch || matchAttr) dup=i;
                         }else if(cat==='aluminio'){
-                            if(it.linea===data.linea && it.serie===data.serie && it.nombre===data.nombre && it.codigo===data.codigo) dup=i;
+                            // Match by Code OR by strict attributes (Line+Serie+Name+Color)
+                            if(codeMatch || (it.linea===data.linea && it.serie===data.serie && it.nombre===data.nombre && it.color===data.color)) dup=i;
                         }else if(cat==='herrajes'){
-                            if(it.nombre===data.nombre && it.codigo===data.codigo) dup=i;
+                            // Match by Code OR by Name+Color
+                            if(codeMatch || (it.nombre===data.nombre && it.color===data.color)) dup=i;
                         }else if(cat==='insumos'){
-                            if(it.nombre===data.nombre && it.tipo===data.tipo && it.codigo===data.codigo) dup=i;
+                            // Match by Code OR by Name+Type+Color
+                            if(codeMatch || (it.nombre===data.nombre && it.tipo===data.tipo && it.color===data.color)) dup=i;
                         }
                     });
 
@@ -817,26 +1895,43 @@
                         const qToAdd = parseInt(data.cantidad)||0;
                         
                         // Option to merge stock
-                        if(confirm(`⚠️ El producto ya existe.\nCódigo: ${ex.codigo}\nStock actual: ${ex.cantidad}\n\n¿Desea sumar la cantidad ingresada (${qToAdd}) al stock existente?`)){
-                             setLoading(true, 'Actualizando stock...', true);
+                        const dupResponse = await showGenericModal({
+                            title: 'Producto Existente', 
+                            message: `⚠️ El producto ya existe.<br><b>Código:</b> ${ex.codigo}<br><b>Stock actual:</b> ${ex.cantidad}<br><br>¿Desea sumar la cantidad ingresada (${qToAdd}) al stock existente?`,
+                            confirmText: 'Sumar al Stock',
+                            cancelText: 'Cancelar'
+                        });
+
+                        if(dupResponse.confirmed){
+                             // For this short action, keep it blocking or just update text
+                             if(document.getElementById('loadingText')) document.getElementById('loadingText').innerText = 'Actualizando stock...';
+                             
                              try {
                                  const newQty = (parseInt(ex.cantidad)||0) + qToAdd;
                                  // Use the existing item 'ex' which has the correct ID/SKU from server
                                  await updateQuantityRemote(cat, ex, newQty);
-                                 alert('Stock actualizado correctamente.');
+                                 await showGenericModal({
+                                     title: 'Stock Actualizado',
+                                     message: 'La cantidad ha sido sumada al producto existente correctamente.',
+                                     confirmText: 'Aceptar'
+                                 });
                                  formArea.classList.add('hidden');
                                  renderTable(cat, busqueda.value);
                              } catch(e) {
                                  console.error(e);
-                                 alert('Error al actualizar stock: ' + e.message);
+                                 await showGenericModal({
+                                     title: 'Error',
+                                     message: 'Error al actualizar stock: ' + e.message,
+                                     confirmText: 'Cerrar'
+                                 });
                              } finally {
-                                 setLoading(false);
+                                 // No extra setLoading(false) needed as we didn't increment
                              }
                         }
                         return;
                     }
 
-                    setLoading(true, 'Guardando nuevo producto...', true);
+                    if(document.getElementById('loadingText')) document.getElementById('loadingText').innerText = 'Guardando nuevo producto...';
 
                     // Send to Apps Script as URL-encoded form (image as base64 field). On error, save locally.
                     // Clean data for notes: ONLY keep user notes, do not dump all data there
@@ -852,6 +1947,7 @@
                         explicitFields.tipo = data.tipo || '';
                         explicitFields.color = data.color || '';
                         explicitFields.forma = data.forma || '';
+                        explicitFields.codigo = data.codigo || ''; // Added codigo
                     } else if(cat === 'aluminio'){
                         explicitFields.linea = data.linea || '';
                         explicitFields.serie = data.serie || '';
@@ -874,12 +1970,18 @@
                         let generatedSku = data.codigo || data.sku || '';
                         if(!generatedSku){
                              // Use a simple ID to avoid visual clutter/duplication
-                             generatedSku = makeId().toUpperCase();
+                             if (cat === 'vidrio') {
+                                 // Numeric and short for Glass as requested
+                                 generatedSku = generateNumericId(6); // 6 digits is short and sweet
+                             } else {
+                                 generatedSku = makeId().toUpperCase();
+                             }
                         }
                         data.codigo = generatedSku; 
 
                         const user = localStorage.getItem('activo') || 'Anonimo';
-                        const actionDetails = `Creación: ${data.nombre || data.linea || 'Item'} (${generatedSku})`;
+                        let actionDetails = `Creación: ${data.nombre || data.linea || 'Item'} (${generatedSku})`;
+                        if(userNotes) actionDetails += ` | Nota: ${userNotes}`;
 
                         const payloadObj = {
                             action: 'create', // Explicitly define action
@@ -912,11 +2014,71 @@
                             // reload authoritative data from Sheets for this category
                             try{
                                 await loadInventoryForCategory(cat);
-                                alert('Producto agregado correctamente.');
+                                
+                                if(cat === 'vidrio'){
+                                     const modalPromise = showGenericModal({
+                                        title: 'Producto Creado Exitosamente',
+                                        message: `
+                                            <div style="text-align:center">
+                                                <p style="margin-bottom:15px">Se ha generado el código: <b>${generatedSku}</b></p>
+                                                <div style="background:white; padding:10px; display:inline-block; border:1px solid #e2e8f0; border-radius:8px;">
+                                                    <canvas id="barcodeCanvas"></canvas>
+                                                </div>
+                                                <p style="font-size:0.8rem; color:#64748b; margin-top:5px">Haga clic en descargar para guardar la etiqueta.</p>
+                                            </div>
+                                        `,
+                                        confirmText: '💾 Descargar Etiqueta',
+                                        cancelText: 'Cerrar'
+                                     });
+                                     
+                                     // Generate Barcode on Canvas
+                                     setTimeout(() => {
+                                         try {
+                                             if(typeof JsBarcode !== 'undefined'){
+                                                 JsBarcode("#barcodeCanvas", generatedSku, {
+                                                     format: "CODE128",
+                                                     lineColor: "#000",
+                                                     width: 2,
+                                                     height: 60,
+                                                     displayValue: true,
+                                                     fontSize: 16,
+                                                     marginTop: 10,
+                                                     marginBottom: 10
+                                                 });
+                                             } else {
+                                                 console.warn("JsBarcode not loaded");
+                                             }
+                                         } catch(e) { console.error("Barcode gen error", e); }
+                                     }, 100);
+                                     
+                                     const resModal = await modalPromise;
+                                     if(resModal.confirmed){
+                                         const canvas = document.getElementById("barcodeCanvas");
+                                         if(canvas){
+                                             const link = document.createElement('a');
+                                             link.download = `etiqueta_${generatedSku}.png`;
+                                             link.href = canvas.toDataURL("image/png");
+                                             link.click();
+                                             showNotification('Etiqueta descargada', 'success');
+                                         }
+                                     }
+                                } else {
+                                    await showGenericModal({
+                                        title: 'Operación Exitosa',
+                                        message: 'El producto ha sido guardado correctamente en la base de datos.',
+                                        confirmText: 'Aceptar'
+                                    });
+                                }
                             }catch(e){
                                 // fallback to local update if reload fails
-                                if(dup>=0){ arr[dup].cantidad = (parseInt(arr[dup].cantidad)||0) + (parseInt(data.cantidad)||0); alert('Duplicado: cantidad sumada (local).'); }
-                                else { arr.push(data); alert('Producto agregado (local).'); }
+                                if(dup>=0){ 
+                                    arr[dup].cantidad = (parseInt(arr[dup].cantidad)||0) + (parseInt(data.cantidad)||0); 
+                                    await showGenericModal({title:'Aviso Local', message:'Duplicado: cantidad sumada (actualización local).', confirmText:'OK'});
+                                }
+                                else { 
+                                    arr.push(data); 
+                                    await showGenericModal({title:'Aviso Local', message:'Producto agregado (actualización local).', confirmText:'OK'});
+                                }
                                 saveInventory();
                             }
                             renderTable(cat, busqueda.value);
@@ -931,7 +2093,11 @@
                         // Assume success for user experience if it was likely a CORS issue on a successful POST
                         if(dup>=0){ arr[dup].cantidad = (parseInt(arr[dup].cantidad)||0) + (parseInt(data.cantidad)||0); }
                         else { arr.push(data); }
-                        alert('Producto guardado (modo offline/local por error de red).');
+                        await showGenericModal({
+                           title: 'Guardado Local',
+                           message: 'Se guardó localmente debido a un error de red o servidor.',
+                           confirmText: 'Entendido'
+                        });
                         saveInventory(); 
                         renderTable(cat, busqueda.value);
                     }
@@ -990,6 +2156,10 @@
                         }
                     } else if(k==='cantidad'){
                         const el = inputs[k]; data[k] = parseInt((el && el.value) || 0) || 0;
+                    } else if(k==='comentarios'){
+                         // map 'comentarios' UI field to 'notes' data field
+                         const el = inputs[k]; 
+                         if(el) data.notes = el.value || ''; 
                     } else {
                         const obj = inputs[k];
                         let val = '';
@@ -1003,7 +2173,17 @@
 
                 if(!pendingFile) await finalize();
             }catch(err){ console.error('Error en guardar nuevo producto',err); alert('Error al guardar (ver consola)'); }
-            finally { setLoading(false); }
+            finally { 
+                setLoading(false); 
+                // Ensure reset if we messed up counters
+                loadingCounter = 0;
+                loadingOverlay.classList.add('hidden');
+                
+                if(save) {
+                    save.disabled = false;
+                    if(originalBtnContent) save.innerHTML = originalBtnContent;
+                }
+            }
         };
         btns.appendChild(cancel); 
         btns.appendChild(save); 
@@ -1024,21 +2204,206 @@
         return url;
     }
 
+    // --- Generic UI Helpers (Async Modals) ---
+    // Replaces global alert, confirm, prompt with custom UI
+    
+    function showGenericModal({title, message, inputs = [], confirmText='Aceptar', cancelText='Cancelar'}){
+        return new Promise((resolve) => {
+             const m = document.getElementById('genericModal');
+             const t = document.getElementById('genericTitle');
+             const c = document.getElementById('genericContent');
+             const iContainer = document.getElementById('genericInputs');
+             const btnOk = document.getElementById('genericConfirm');
+             const btnCancel = document.getElementById('genericCancel');
+             
+             t.innerText = title;
+             c.innerHTML = message || ''; // Allow HTML
+             btnOk.innerText = confirmText;
+             btnCancel.innerText = cancelText;
+
+             // Build inputs if any
+             iContainer.innerHTML = '';
+             if(inputs && inputs.length > 0){
+                 iContainer.style.display = 'block';
+                 inputs.forEach(inpDef => {
+                      const div = document.createElement('div');
+                      div.style.marginBottom = '10px';
+                      
+                      if(inpDef.label){
+                          const lbl = document.createElement('label');
+                          lbl.style.display='block';
+                          lbl.style.marginBottom='4px';
+                          lbl.style.fontSize='0.9rem';
+                          lbl.style.fontWeight='500';
+                          lbl.innerText=inpDef.label;
+                          div.appendChild(lbl);
+                      }
+                      
+                      if(inpDef.type === 'select'){
+                          const sel = document.createElement('select');
+                          sel.className = 'form-input';
+                          sel.id = inpDef.id || ('inp_'+Math.random());
+                          if(inpDef.options){
+                              inpDef.options.forEach(opt => {
+                                  const o = document.createElement('option');
+                                  o.value = opt.value;
+                                  o.innerText = opt.text;
+                                  sel.appendChild(o);
+                              });
+                          }
+                          div.appendChild(sel);
+                      } else {
+                          const inp = document.createElement('input');
+                          inp.type = inpDef.type || 'text';
+                          inp.className = 'form-input';
+                          inp.id = inpDef.id || ('inp_'+Math.random());
+                          if(inpDef.value) inp.value = inpDef.value;
+                          if(inpDef.placeholder) inp.placeholder = inpDef.placeholder;
+                          div.appendChild(inp);
+                      }
+                      iContainer.appendChild(div);
+                 });
+             } else {
+                 iContainer.style.display = 'none';
+             }
+             
+             m.classList.remove('hidden');
+             
+             // Focus first input
+             if(inputs && inputs.length>0){
+                 const first = iContainer.querySelector('input, select');
+                 if(first) first.focus();
+             }
+
+             const cleanup = () => {
+                 btnOk.onclick = null;
+                 btnCancel.onclick = null;
+                 m.classList.add('hidden');
+             };
+             
+             btnOk.onclick = () => {
+                 const result = {};
+                 if(inputs && inputs.length > 0){
+                     inputs.forEach(def => {
+                         const el = document.getElementById(def.id);
+                         if(el) result[def.id] = el.value;
+                     });
+                     cleanup();
+                     resolve({confirmed:true, values:result});
+                 } else {
+                     cleanup();
+                     resolve({confirmed:true});
+                 }
+             };
+             
+             btnCancel.onclick = () => {
+                 cleanup();
+                 resolve({confirmed:false});
+             };
+        });
+    }
+
+    // --- Transaction Helper (Updated to use Modal) ---
+    async function requestTransaction(title, defaultQty = 0) {
+         // Reuse the new generic modal for transaction flow
+         // We construct inputs manually
+         const result = await showGenericModal({
+             title: title,
+             message: 'Ingrese los detalles de la operación:',
+             confirmText: 'Confirmar',
+             inputs: [
+                 { id:'qty', label:'Cantidad', type:'number', value:defaultQty || '', placeholder:'0' },
+                 { id:'comment', label:'Comentarios / Notas', type:'text', placeholder:'Opcional' }
+             ]
+         });
+         
+         if(result.confirmed){
+             const q = parseInt(result.values.qty);
+             if(!q || q <= 0){
+                 alert('Cantidad inválida');
+                 return null;
+             }
+             return { qty:q, comment:result.values.comment || '' };
+         }
+         return null;
+    }
+    
+    /* Legacy helper kept for replacement reference
+    function requestTransaction(title, defaultQty = 0) {
+        return new Promise((resolve) => {
+            const modal = document.getElementById('transactionModal');
+            const qtyInput = document.getElementById('transQty');
+            const commentInput = document.getElementById('transComment');
+            const titleEl = document.getElementById('transTitle');
+            const btnConfirm = document.getElementById('transConfirm');
+            const btnCancel = document.getElementById('transCancel');
+
+            titleEl.innerText = title;
+            qtyInput.value = defaultQty || '';
+            commentInput.value = '';
+            
+            modal.classList.remove('hidden');
+            qtyInput.focus();
+
+            const cleanup = () => {
+                btnConfirm.onclick = null;
+                btnCancel.onclick = null;
+                modal.classList.add('hidden');
+            };
+
+            btnConfirm.onclick = () => {
+                const q = parseInt(qtyInput.value);
+                const c = commentInput.value.trim();
+                // ...
+    */ 
+    
+    // --- End UI Helpers ---
+            /* btnConfirm.onclick = () => {
+                const q = parseInt(qtyInput.value);
+                const c = commentInput.value.trim();
+                if (!q || q <= 0) {
+                    alert('Por favor ingrese una cantidad válida');
+                    return;
+                }
+                cleanup();
+                resolve({ qty: q, comment: c });
+            };
+
+            btnCancel.onclick = () => {
+                cleanup();
+                resolve(null);
+            };
+        });
+    } */
+
     // --- Table rendering ---
     function renderTable(cat, filter=''){
         try {
             console.log('renderTable start',cat,filter);
+            console.log('Current Inventory Counts:', Object.keys(inventory).map(k=> k + ':' + (inventory[k] ? inventory[k].length : 0)).join(', '));
             const field = filterField? filterField.value : 'Todos';
             const q = (filter||'').toString().trim().toLowerCase();
             tablesArea.innerHTML = '';
             const renderCategory = (c)=>{
                 if(!templates[c]) return;
-                const cont = document.createElement('div'); cont.className='container';
+                const cont = document.createElement('div'); cont.className='card-panell';
                 const h = document.createElement('h3'); h.innerText = c.toUpperCase(); cont.appendChild(h);
+                
+                // Responsive Wrapper
+                const respContainer = document.createElement('div');
+                respContainer.className = 'table-responsive';
+                
                 const tbl = document.createElement('table');
                 const thead = document.createElement('thead'); const hr = document.createElement('tr');
-                templates[c].forEach(col=>{ const th=document.createElement('th'); th.innerText=col.toUpperCase(); hr.appendChild(th); });
+                templates[c].forEach(col=>{ 
+                    if(col === 'comentarios') return;
+                    const th=document.createElement('th'); th.innerText=col.toUpperCase(); hr.appendChild(th); 
+                });
                 const tha = document.createElement('th'); tha.innerText='ACCIONES'; hr.appendChild(tha); thead.appendChild(hr); tbl.appendChild(thead);
+                
+                respContainer.appendChild(tbl);
+                cont.appendChild(respContainer);
+                
                 const tbody = document.createElement('tbody');
                 
                 // Sort items alphabetically by name, then by color
@@ -1058,6 +2423,47 @@
                         // Special filter for 'agotados'
                         if(cat === 'agotados' && (parseInt(item.cantidad)||0) > 0) return;
 
+                        // Special filter for Vidrio (Type & Measure)
+                        if(c === 'vidrio'){
+                             const vTipoEl = document.getElementById('vidrioTipoFilter');
+                             const vMedida1El = document.getElementById('vidrioMedida1Filter');
+                             const vMedida2El = document.getElementById('vidrioMedida2Filter');
+                             if(vTipoEl){
+                                 const vTipo = vTipoEl.value;
+                                 const vM1 = parseFloat(vMedida1El ? vMedida1El.value : 0) || 0;
+                                 const vM2 = parseFloat(vMedida2El ? vMedida2El.value : 0) || 0;
+
+                                 // Filter by Type
+                                 if(vTipo && (item.tipo||'').toString().trim() !== vTipo) return;
+                                 
+                                 // "busque por medida igual o mayor (tomando ambas medidas)"
+                                 // Logic: The item must have dimensions at least as large as the requested dimensions.
+                                 // We allow rotation: (Item W >= Req W AND Item H >= Req H) OR (Item W >= Req H AND Item H >= Req W)
+                                 
+                                 if(vM1 > 0 || vM2 > 0){
+                                     const iM1 = parseFloat(item.medida1 || 0);
+                                     const iM2 = parseFloat(item.medida2 || 0);
+                                     
+                                     // Logic: Does the requested piece (vM1 x vM2) fit into the item (iM1 x iM2)?
+                                     // Ideally, we verify if the available rectangle is larger than the needed one.
+                                     // Using sorted dimensions (Min x Max) handles rotation automatically.
+                                     // If user provided 50 x 100, we check if 50 fits in Min(Item) and 100 fits in Max(Item).
+                                     
+                                     const reqMin = Math.min(vM1, vM2);
+                                     const reqMax = Math.max(vM1, vM2);
+                                     
+                                     const itemMin = Math.min(iM1, iM2);
+                                     const itemMax = Math.max(iM1, iM2);
+
+                                     // Note: If user leaves one field empty (0), reqMin will be 0. 
+                                     // itemMin >= 0 is always true. So we effectively only check reqMax <= itemMax.
+                                     // This supports "One side >= X" logic correctly.
+                                     
+                                     if(itemMin < reqMin || itemMax < reqMax) return;
+                                 }
+                             }
+                        }
+
                         // match depending on selected field
                         let match = true;
                         if(q){
@@ -1072,6 +2478,7 @@
                         if(!match) return;
                         const tr = document.createElement('tr');
                         templates[c].forEach(key=>{
+                            if(key === 'comentarios') return;
                             const td = document.createElement('td');
                             if(key==='image'){
                                 let src = item.imageUrl || item.imageData;
@@ -1102,18 +2509,117 @@
                             } else td.innerText = item[key] || '';
                             tr.appendChild(td);
                         });
-                        const tdA = document.createElement('td'); tdA.className='actions';
+                        const tdA = document.createElement('td'); tdA.className='actions-cell';
+                        const divA = document.createElement('div'); divA.className='actions';
+                        tdA.appendChild(divA);
+                        
                         const inBtn = document.createElement('button'); inBtn.innerText='Entrada'; inBtn.className='btn-entry';
                         if(isSyncing) { inBtn.disabled=true; inBtn.style.opacity='0.5'; inBtn.style.cursor='not-allowed'; }
                         inBtn.addEventListener('click', async ()=>{ 
                             try{ 
-                                const q=parseInt(prompt('Cantidad a agregar')||0); 
-                                if(!q) return; 
+                                // Logic for Andamiaje Return (Must be top priority)
+                                if(c === 'andamiaje'){
+                                    const isOutside = (item.lugar && item.lugar.toLowerCase() !== 'bodega' && item.lugar.trim() !== '');
+                                    
+                                    if(isOutside){
+                                         const result = await requestTransaction('Devolución a Bodega');
+                                         if(!result) return;
+                                         const q = result.qty;
+                                         const comment = result.comment;
+                                         
+                                         setLoading(true, 'Procesando devolución...', false);
+                                         
+                                         // 1. Check Outside Stock
+                                         await loadInventoryForCategory(c);
+                                         const freshOutsideList = (inventory[c]||[]).filter(x => x.codigo === item.codigo && x.lugar === item.lugar);
+                                         const targetOutside = freshOutsideList[0];
+                                         
+                                         if(!targetOutside){ alert('No se encuentra el item externo.'); return; }
+                                         if(parseInt(targetOutside.cantidad) < q){ alert('No puedes devolver más de lo que hay fuera.'); return; }
+                                         
+                                         // 2. Reduce Outside
+                                         const newQtyOutside = parseInt(targetOutside.cantidad) - q;
+                                         await updateQuantityRemote(c, targetOutside, newQtyOutside, comment + ' (Devolución)', item.lugar);
+                                         
+                                         // 3. Increase Bodega
+                                         // Robust search for destination item (Bodega/Original)
+                                     const candidates = (inventory[c]||[]).filter(x => 
+                                         String(x.codigo) === String(item.codigo) && 
+                                         String(x.lugar || 'bodega').toLowerCase().trim() !== String(item.lugar || 'bodega').toLowerCase().trim()
+                                     );
+                                     let bodegaItem = null;
+                                         
+                                         // User selection based on user request (avoid auto-selecting wrong warehouse)
+                                         if(candidates.length === 1){
+                                             bodegaItem = candidates[0];
+                                         } else if(candidates.length > 1){
+                                             // Custom Generic Modal for Selection
+                                             const options = candidates.map((cand, idx) => ({
+                                                 value: idx.toString(),
+                                                 text: `${cand.lugar || 'Bodega Principal'} (Stock: ${cand.cantidad})`
+                                             }));
+
+                                             const selResult = await showGenericModal({
+                                                 title: 'Seleccione Destino de Devolución',
+                                                 message: `Se encontraron ${candidates.length} destinos posibles. Seleccione a dónde enviar los items:`,
+                                                 confirmText: 'Enviar',
+                                                 inputs: [
+                                                     { id:'choice', label:'Destino', type:'select', options:options }
+                                                 ]
+                                             });
+                                             
+                                             if(selResult.confirmed){
+                                                  const idx = parseInt(selResult.values.choice);
+                                                  bodegaItem = candidates[idx];
+                                             } else {
+                                                  return; // Cancelled
+                                             }
+                                         } else {
+                                              // Zero candidates. Check if user WANTS to create one?
+                                              // Use Generic Modal instead of confirm
+                                              const createConfirm = await showGenericModal({
+                                                  title: 'Destino no encontrado',
+                                                  message: 'No existe item en Bodega para este SKU.<br>¿Desea crear una "Bodega" nueva y depositar ahí?',
+                                                  confirmText: 'Crear Bodega',
+                                                  cancelText: 'Cancelar'
+                                              });
+                                              if(!createConfirm.confirmed){
+                                                  return;
+                                              }
+                                              // Fallthrough to create logic
+                                         }
+                                         
+                                         if(bodegaItem){
+                                              const newQtyBodega = parseInt(bodegaItem.cantidad) + q;
+                                              // Ensure we pass the actual lugar string (even if empty) to strict selector
+                                              const targetLoc = (bodegaItem.lugar === undefined || bodegaItem.lugar === null) ? '' : bodegaItem.lugar;
+                                              await updateQuantityRemote(c, bodegaItem, newQtyBodega, comment + ' (Reingreso)', targetLoc);
+                                         } else {
+                                              console.warn('Bodega item not found locally for SKU:', item.codigo, 'Inv:', inventory[c]);
+                                              // Create Bodega Item
+                                              const newItemProps = Object.assign({}, item);
+                                              newItemProps.lugar = 'Bodega';
+                                              newItemProps.cantidad = q;
+                                              newItemProps.notas = comment;
+                                              delete newItemProps.id; 
+                                              await createItemRemote(c, newItemProps);
+                                         }
+                                         
+                                         await loadInventoryForCategory(c);
+                                         renderTable(categoriaSel.value, busqueda.value);
+                                         return;
+                                    }
+                                }
+
+                                const result = await requestTransaction('Entrada de producto');
+                                if(!result) return;
+                                const q = result.qty;
+                                const comment = result.comment;
                                 
                                 // Safety Check: Fetch latest data before modifying
-                                setLoading(true, 'Verificando stock en servidor...', true);
-                                // Optimized: Fetch single item instead of whole category
-                                const freshItem = await loadItemRemote(c, item.codigo || item.sku);
+                                setLoading(true, 'Verificando stock en servidor...', false);
+                                // Optimized: Fetch single item instead of whole category - NOW PASSING LUGAR
+                                const freshItem = await loadItemRemote(c, item.codigo || item.sku, item.lugar);
                                 
                                 if(!freshItem){
                                     alert('Error: El producto no se encuentra en el servidor (pudo ser eliminado).');
@@ -1123,13 +2629,31 @@
                                     return;
                                 }
 
+                                // Use current lookupLugar if provided (for Andamiaje)
+                                // IMPORTANT: Use item.lugar for all categories to support multi-location stock
+                                const lookupLugar = item.lugar || 'Bodega';
+
+                                // Note: freshItem might not have 'lugar' populated correctly if loadItemRemote doesn't map it.
+                                // But updateQuantityRemote uses item.lugar we pass.
+                                
                                 const newQty = (parseInt(freshItem.cantidad)||0) + q; 
-                                await updateQuantityRemote(c, freshItem, newQty); 
+                                await updateQuantityRemote(c, freshItem, newQty, comment, lookupLugar); 
                                 
                                 // Update local state manually since we skipped full reload
                                 item.cantidad = newQty;
-                                const mainItem = (inventory[c]||[]).find(x => x.codigo === item.codigo);
-                                if(mainItem) mainItem.cantidad = newQty;
+                                /* if(c === 'andamiaje'){
+                                    // Recalculate total if base quantity changed
+                                    item.total = newQty + (item.adicionales||0);
+                                } */
+
+                                const mainItem = (inventory[c]||[]).find(x => 
+                                    x.codigo === item.codigo && 
+                                    String(x.lugar||'').trim().toLowerCase() === String(item.lugar||'').trim().toLowerCase()
+                                );
+                                if(mainItem) {
+                                    mainItem.cantidad = newQty;
+                                    // if(c === 'andamiaje') mainItem.total = item.total;
+                                }
                                 
                                 renderTable(categoriaSel.value, busqueda.value); 
                             }catch(e){ 
@@ -1140,20 +2664,130 @@
                             }
                         });
 
+
                         const outBtn = document.createElement('button'); outBtn.innerText='Salida'; outBtn.className='btn-exit';
                         if(isSyncing) { outBtn.disabled=true; outBtn.style.opacity='0.5'; outBtn.style.cursor='not-allowed'; }
                         outBtn.addEventListener('click', async ()=>{ 
                             try{ 
-                                const q=parseInt(prompt('Cantidad a retirar')||0); 
-                                if(!q) return; 
+                                // Logic for Andamiaje Checkout (Must be top priority)
+                                if(c === 'andamiaje'){
+                                    // Extended Transaction UI: Capture details + Destination in one modal
+                                    const modalResult = await showGenericModal({
+                                        title: 'Salida a Obra/Cliente',
+                                        message: 'Complete los datos de la salida:',
+                                        confirmText: 'Procesar',
+                                        inputs: [
+                                            { id:'qty', label:'Cantidad', type:'number', placeholder:'0' },
+                                            { id:'destination', label:'Lugar de Destino (Obra/Cliente)', type:'text', placeholder:'Ej. Obra Centro' },
+                                            { id:'comment', label:'Comentarios (Opcional)', type:'text', placeholder:'Notas de referencia' }
+                                        ]
+                                    });
+                                    
+                                    if(!modalResult.confirmed) return;
+                                    const q = parseInt(modalResult.values.qty);
+                                    if(!q || q <= 0){ alert('Cantidad inválida'); return; }
+                                    const comment = modalResult.values.comment || '';
+                                    const destination = (modalResult.values.destination || '').trim();
+                                    
+                                    if(!destination){ showNotification('Debe ingresar un lugar de destino', 'warning'); return; }
+
+                                    setLoading(true, 'Procesando salida...', false);
+                                    
+                                    // 1. Verify Stock
+                                    const freshItem = await loadItemRemote(c, item.codigo || item.sku, item.lugar);
+                                    if(!freshItem || parseInt(freshItem.cantidad) < q){
+                                        const stockActual = freshItem ? freshItem.cantidad : 'N/A';
+                                        showNotification(`Stock insuficiente (Solicitado: ${q}, Disponible: ${stockActual}).`, 'error'); return;
+                                    }
+                                    
+                                    // 2. Reduce Stock of Original
+                                    const newQty = parseInt(freshItem.cantidad) - q;
+                                    await updateQuantityRemote(c, freshItem, newQty, comment + ` (Salida a ${destination})`, item.lugar);
+
+                                    // 3. Check for Existing item at Destination (Merge Logic)
+                                    let merged = false;
+                                    await loadInventoryForCategory(c); 
+                                    const existingDest = (inventory[c]||[]).find(x => 
+                                        String(x.codigo) === String(item.codigo) && 
+                                        String(x.lugar||'').trim().toLowerCase() === String(destination).trim().toLowerCase()
+                                    );
+                                    
+                                    if(existingDest){
+                                         // Custom Generic Modal for Merge Confirmation
+                                         const mergeConfirm = await showGenericModal({
+                                             title: 'Producto Existente Detectado',
+                                             message: `El producto ya existe en <b>"${destination}"</b> (Stock Actual: ${existingDest.cantidad}).<br><br>¿Qué desea hacer con estos <b>${q}</b> nuevos items?`,
+                                             confirmText: 'Fusionar (Sumar)',
+                                             cancelText: 'Crear Nuevo (Separar)',
+                                             // No inputs, just choice buttons
+                                         });
+                                         
+                                         if(mergeConfirm.confirmed){ // "Fusionar" clicked
+                                             const newDestQty = (parseInt(existingDest.cantidad)||0) + q;
+                                             const newDestTotal = (parseInt(existingDest.total)||0) + q;
+                                             
+                                             await updateItemRemote(c, existingDest, {
+                                                cantidad: newDestQty,
+                                                quantity: newDestQty,
+                                                total: newDestTotal
+                                             }, comment + ' (Fusionado desde Salida)', existingDest.lugar);
+                                             merged = true;
+                                         }
+                                    }
+
+                                    if(!merged){
+                                        // 4. Create Variant Item (Clone) - FILTERED to avoid URL length issues
+                                        const cloneItem = {};
+                                        // Only copy fields defined in the template + a few critical ones
+                                        // EXCLUDE 'image' from auto-copy to prevent Base64 overflow
+                                        const fieldsToCopy = (templates[c] || []).concat(['nombre','sku','codigo','medida1','medida2','grosor','forma','linea','serie','altura','subtipo']).filter(f => f !== 'image');
+                                        const uniqueFields = [...new Set(fieldsToCopy)];
+                                        
+                                        uniqueFields.forEach(f => {
+                                            if(freshItem[f] !== undefined && freshItem[f] !== null) cloneItem[f] = freshItem[f];
+                                        });
+                                        
+                                        // Overwrite specific logic fields
+                                        cloneItem.lugar = destination;
+                                        cloneItem.cantidad = q;
+                                        cloneItem.quantity = q; // Send both to ensure backend catches it
+                                        cloneItem.adicionales = 0; 
+                                        // FORCE Total to be just the Quantity (since extras are 0)
+                                        cloneItem.total = q; 
+                                        cloneItem.notas = comment; 
+                                        
+                                        // Handle Image: Copy whatever we have (URL or Base64). 
+                                        // The createItemRemote function now uses POST, so it can handle Base64.
+                                        const sourceImg = freshItem.imageUrl || freshItem.image || freshItem.imageData;
+                                        if(sourceImg){
+                                            cloneItem.imageUrl = sourceImg;
+                                            cloneItem.image = sourceImg;
+                                        }
+
+                                        // Ensure we don't send ID
+                                        delete cloneItem.id; 
+                                        delete cloneItem.inventoryId; 
+                                        
+                                        await createItemRemote(c, cloneItem);
+                                    }
+
+                                    await loadInventoryForCategory(c);
+                                    renderTable(categoriaSel.value, busqueda.value);
+                                    return;
+                                }
+
+                                const result = await requestTransaction('Salida de producto');
+                                if(!result) return;
+                                const q = result.qty;
+                                const comment = result.comment;
                                 
                                 // Safety Check: Fetch latest data before modifying
-                                setLoading(true, 'Verificando stock en servidor...', true);
+                                setLoading(true, 'Verificando stock en servidor...', false);
                                 // Optimized: Fetch single item instead of whole category
-                                const freshItem = await loadItemRemote(c, item.codigo || item.sku);
+                                const freshItem = await loadItemRemote(c, item.codigo || item.sku, item.lugar);
 
                                 if(!freshItem){
-                                    alert('Error: El producto no se encuentra en el servidor (pudo ser eliminado).');
+                                    showNotification('Error: El producto no se encuentra en el servidor (pudo ser eliminado).', 'error');
                                     await loadInventoryForCategory(c);
                                     renderTable(categoriaSel.value, busqueda.value);
                                     return;
@@ -1161,7 +2795,7 @@
 
                                 const currentStock = parseInt(freshItem.cantidad)||0;
                                 if(currentStock < q) {
-                                    alert(`Stock insuficiente en el servidor.\nStock actual real: ${currentStock}\nIntentaste retirar: ${q}`);
+                                    showNotification(`Stock insuficiente en el servidor. Stock actual real: ${currentStock}. Intentaste retirar: ${q}`, 'error');
                                     // Update local to match server reality
                                     item.cantidad = currentStock;
                                     const mainItem = (inventory[c]||[]).find(x => x.codigo === item.codigo);
@@ -1171,12 +2805,34 @@
                                 }
 
                                 const newQty = currentStock - q; 
-                                await updateQuantityRemote(c, freshItem, newQty); 
+                                const updateResp = await updateQuantityRemote(c, freshItem, newQty, comment, item.lugar); 
                                 
                                 // Update local state manually
-                                item.cantidad = newQty; 
-                                const mainItem = (inventory[c]||[]).find(x => x.codigo === item.codigo);
-                                if(mainItem) mainItem.cantidad = newQty;
+                                    // Handling Vidrio Auto-Delete: If server says deleted OR (Vidrio & qty<=0)
+                                if((updateResp && updateResp.deleted) || (c === 'vidrio' && newQty <= 0)){
+                                    // Remove from array - Match by Code AND Lugar
+                                    const idx = (inventory[c]||[]).findIndex(x => 
+                                        x.codigo === item.codigo && 
+                                        String(x.lugar||'').trim().toLowerCase() === String(item.lugar||'').trim().toLowerCase()
+                                    );
+                                    if(idx > -1) inventory[c].splice(idx, 1);
+                                    
+                                    // Force refresh of filter lists like "Tipo Vidrio" to remove stale types
+                                    if(populateVidrioTypes) populateVidrioTypes();
+                                } else {
+                                    item.cantidad = newQty; 
+                                    // if(c === 'andamiaje') item.total = newQty + (item.adicionales||0);
+
+                                    // Local update - Match by Code AND Lugar to prevent cross-location phantom updates
+                                    const mainItem = (inventory[c]||[]).find(x => 
+                                        x.codigo === item.codigo && 
+                                        String(x.lugar||'').trim().toLowerCase() === String(item.lugar||'').trim().toLowerCase()
+                                    );
+                                    if(mainItem) {
+                                        mainItem.cantidad = newQty;
+                                        // if(c === 'andamiaje') mainItem.total = item.total;
+                                    }
+                                }
 
                                 renderTable(categoriaSel.value, busqueda.value); 
                             }catch(e){ 
@@ -1187,7 +2843,71 @@
                             }
                         });
                         
-                        tdA.appendChild(inBtn); tdA.appendChild(outBtn); tr.appendChild(tdA);
+                        if(c === 'andamiaje'){
+                            const addBtn = document.createElement('button'); 
+                            addBtn.innerText='Agregar'; 
+                            addBtn.className='btn-entry';
+                            addBtn.style.marginRight='5px';
+                            addBtn.style.backgroundColor='#0f172a'; // Distinct color (dark slate)
+                            if(isSyncing) { addBtn.disabled=true; addBtn.style.opacity='0.5'; addBtn.style.cursor='not-allowed'; }
+                            addBtn.addEventListener('click', async ()=>{ 
+                                try{ 
+                                    const result = await requestTransaction('Agregar Piezas (Adicionales)');
+                                    if(!result) return;
+                                    const q = result.qty;
+                                    const comment = result.comment;
+                                    setLoading(true, 'Procesando...', false);
+                                    
+                                    const freshItem = await loadItemRemote(c, item.codigo || item.sku, item.lugar);
+                                    if(!freshItem){ alert('Item no encontrado'); await loadInventoryForCategory(c); renderTable(categoriaSel.value, busqueda.value); return; }
+                                    
+                                    // Logic: Update STOCK and Total (Only - decoupled from 'adicionales')
+                                    const currentQty = parseInt(freshItem.cantidad) || 0;
+                                    const currentTotal = parseInt(freshItem.total) || 0;
+                                    
+                                    const newQty = currentQty + q;
+                                    const newTotal = currentTotal + q;
+                                    
+                                    // We update quantity and total. We DO NOT touch 'adicionales' to avoid phantom increases.
+                                    await updateItemRemote(c, freshItem, {
+                                        cantidad: newQty,
+                                        quantity: newQty, // Ensure canonical key is sent
+                                        total: newTotal
+                                    }, comment, item.lugar); 
+                                    
+                                    // Update local
+                                    item.cantidad = newQty;
+                                    item.total = newTotal;
+                                    
+                                    const mainItem = (inventory[c]||[]).find(x => 
+                                        x.codigo === item.codigo && 
+                                        String(x.lugar||'').trim().toLowerCase() === String(item.lugar||'').trim().toLowerCase()
+                                    );
+                                    if(mainItem) {
+                                        mainItem.cantidad = newQty;
+                                        mainItem.total = newTotal;
+                                    }
+                                    renderTable(categoriaSel.value, busqueda.value); 
+                                }catch(e){ console.error('Error agregar',e); alert('Error: '+(e.message||e)); } finally { setLoading(false); }
+                            });
+                            
+                            // --- VISIBILITY LOGIC (Andamiaje) ---
+                            // Bodega: Show ADD, OUT. Hide IN.
+                            // Obra: Show IN. Hide ADD, OUT.
+                            const isBodega = !item.lugar || String(item.lugar).trim() === '' || String(item.lugar).toLowerCase().includes('bodega');
+                            
+                            if(isBodega){
+                                divA.appendChild(addBtn); // Agregar
+                                divA.appendChild(outBtn); // Salida
+                            } else {
+                                divA.appendChild(inBtn);  // Entrada (Devolución)
+                            }
+                        } else {
+                            // Non-Andamiaje categories: Default behavior
+                            divA.appendChild(inBtn);
+                            divA.appendChild(outBtn);
+                        }
+                        tr.appendChild(tdA);
                         tbody.appendChild(tr);
                     }catch(err){ console.error('Error renderTable item',item,err); }
                 });
@@ -1209,7 +2929,11 @@
             };
 
             if(!cat || cat==='todas' || cat==='agotados'){
-                allCategories.forEach(c=> renderCategory(c));
+                allCategories.forEach(c=> {
+                    // Filter: Hide Andamiaje from "Todas" view
+                    if((!cat || cat === 'todas') && c === 'andamiaje') return;
+                    renderCategory(c);
+                });
             } else {
                 if(!templates[cat]){ console.warn('renderTable: categoría inválida, mostrando todas'); allCategories.forEach(c=> renderCategory(c)); return; }
                 renderCategory(cat);
@@ -1221,21 +2945,302 @@
     }
 
     // --- Admin functions ---
-    function actualizarUsuariosAdmin(){
-        const tbody = document.querySelector('#tablaUsuariosAdmin tbody'); tbody.innerHTML='';
-        for(const u in usuarios){ if(u==='admin') continue; const tr = document.createElement('tr'); const td1=document.createElement('td'); td1.innerText=u; const td2=document.createElement('td'); td2.innerText = usuarios[u].autorizado? 'Autorizado':'Pendiente'; const td3=document.createElement('td'); const b1=document.createElement('button'); b1.innerText='✔'; b1.onclick=()=>{ usuarios[u].autorizado=true; log.push({fecha:new Date().toLocaleString(),usuario:'admin',accion:'Autorizó '+u}); saveUsers(); saveLog(); actualizarUsuariosAdmin(); actualizarLogAdmin(); }; const b2=document.createElement('button'); b2.innerText='✖'; b2.onclick=()=>{ usuarios[u].autorizado=false; log.push({fecha:new Date().toLocaleString(),usuario:'admin',accion:'Bloqueó '+u}); saveUsers(); saveLog(); actualizarUsuariosAdmin(); actualizarLogAdmin(); }; td3.appendChild(b1); td3.appendChild(b2); tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tbody.appendChild(tr); }
+    function showAdminTab(tab){
+        const usersView = document.getElementById('adminUsersView');
+        const logView = document.getElementById('adminLogView');
+        const btnUsers = document.getElementById('btnAdminUsers');
+        const btnLog = document.getElementById('btnAdminLog');
+
+        if(tab === 'users'){
+            usersView.classList.remove('hidden');
+            logView.classList.add('hidden');
+            
+            btnUsers.classList.add('active');
+            btnLog.classList.remove('active');
+            
+            // Refresh users
+            actualizarUsuariosAdmin();
+        } else {
+            usersView.classList.add('hidden');
+            logView.classList.remove('hidden');
+            
+            btnUsers.classList.remove('active');
+            btnLog.classList.add('active');
+            
+            // Refresh log
+            actualizarLogAdmin();
+        }
     }
-    function actualizarLogAdmin(){ const tbody = document.querySelector('#tablaLogAdmin tbody'); tbody.innerHTML=''; log.forEach(l=>{ const tr=document.createElement('tr'); const td1=document.createElement('td'); td1.innerText=l.fecha; const td2=document.createElement('td'); td2.innerText=l.usuario; const td3=document.createElement('td'); td3.innerText=l.accion; tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tbody.appendChild(tr); }); }
+
+    async function actualizarUsuariosAdmin(){
+        const tbody = document.querySelector('#tablaUsuariosAdmin tbody');
+        if(!tbody) return;
+        tbody.innerHTML='<tr><td colspan="3" style="text-align:center; padding:20px; color: #64748b;">Cargando usuarios...</td></tr>';
+        
+        try {
+            const body = new URLSearchParams({ action: 'getUsers' });
+            const res = await fetch(GAS_URL, { method: 'POST', body: body });
+            const data = await res.json();
+            
+            if(data.ok && data.users){
+                tbody.innerHTML = '';
+                data.users.forEach(u => {
+                    if(u.user === 'admin') return; 
+
+                    const tr = document.createElement('tr'); 
+                    
+                    // User
+                    const td1=document.createElement('td'); 
+                    td1.setAttribute('data-label', 'Usuario');
+                    td1.innerHTML = `<div style="font-weight:500; color:#0f172a;">${u.user}</div>`;
+                    
+                    // Status
+                    const td2=document.createElement('td'); 
+                    td2.setAttribute('data-label', 'Estado');
+                    const isAuth = (String(u.authorized) === 'true' || String(u.authorized) === 'TRUE');
+                    const badge = document.createElement('span');
+                    badge.className = isAuth ? 'badge badge-success' : 'badge badge-warning';
+                    badge.innerText = isAuth ? 'Autorizado' : 'Pendiente';
+                    td2.appendChild(badge);
+
+                    // Actions / Role
+                    const td3=document.createElement('td');
+                    td3.setAttribute('data-label', 'Acción');
+                    td3.style.display = 'flex';
+                    td3.style.gap = '8px';
+                    td3.style.alignItems = 'center';
+                    
+                    // Role Selector
+                    const sel = document.createElement('select');
+                    sel.style.padding = '4px 8px';
+                    sel.style.borderRadius = '6px';
+                    sel.style.border = '1px solid #cbd5e1';
+                    sel.style.fontSize = '0.85rem';
+                    sel.style.background = 'white';
+                    sel.style.cursor = 'pointer';
+
+                    ['visor','editor','administrador', 'taller'].forEach(r => {
+                        const opt = document.createElement('option');
+                        opt.value = r;
+                        opt.innerText = r.charAt(0).toUpperCase() + r.slice(1);
+                        if((u.role||'visor') === r) opt.selected = true;
+                        sel.appendChild(opt);
+                    });
+                    
+                    sel.onchange = async () => {
+                         if(confirm(`¿Cambiar rol de ${u.user} a ${sel.value}?`)){
+                             setLoading(true, 'Actualizando rol...');
+                             try {
+                                 const body = new URLSearchParams({ 
+                                     action: 'changeRole', 
+                                     targetUser: u.user, 
+                                     newRole: sel.value 
+                                 });
+                                 await fetch(GAS_URL, {method:'POST', body:body});
+                                 showNotification('Rol actualizado', 'success');
+                                 actualizarUsuariosAdmin(); // Refresh
+                             } catch(e) { 
+                                 showNotification('Error: ' + e.message, 'error'); 
+                                 sel.value = u.role; // Revert
+                             } finally { setLoading(false); }
+                         } else {
+                             sel.value = u.role;
+                         }
+                    };
+                    td3.appendChild(sel);
+                    
+                    // Auth Action Button (Approve / Revoke)
+                    const btnAuth = document.createElement('button');
+                    btnAuth.style.display = 'inline-flex';
+                    btnAuth.style.alignItems = 'center';
+                    btnAuth.style.justifyContent = 'center';
+                    btnAuth.style.width = '28px';
+                    btnAuth.style.height = '28px';
+                    btnAuth.style.borderRadius = '6px';
+                    btnAuth.style.border = '1px solid transparent';
+                    btnAuth.style.cursor = 'pointer';
+                    btnAuth.style.transition = 'all 0.2s';
+                    
+                    if(!isAuth){
+                        // Approve
+                        btnAuth.innerHTML = '✓'; 
+                        btnAuth.title = 'Aprobar acceso';
+                        btnAuth.style.color = '#15803d'; // green-700
+                        btnAuth.style.backgroundColor = '#dcfce7'; // green-100
+                        btnAuth.style.borderColor = '#bbf7d0'; // green-200
+                        
+                        btnAuth.onmouseover = () => btnAuth.style.backgroundColor = '#bbf7d0';
+                        btnAuth.onmouseout = () => btnAuth.style.backgroundColor = '#dcfce7';
+
+                        btnAuth.onclick = async ()=>{ 
+                             setLoading(true, 'Aprobando...');
+                             try{
+                                const body = new URLSearchParams({ action: 'approveUser', targetUser: u.user });
+                                await fetch(GAS_URL, {method:'POST', body:body});
+                                actualizarUsuariosAdmin();
+                             }catch(e){ alert('Error: '+e.message); }
+                             finally{ setLoading(false); }
+                        }; 
+                    } else {
+                        // Revoke
+                        btnAuth.innerHTML = '✕'; 
+                        btnAuth.title = 'Revocar acceso';
+                        btnAuth.style.color = '#b91c1c'; // red-700
+                        btnAuth.style.backgroundColor = '#fee2e2'; // red-100
+                        btnAuth.style.borderColor = '#fecaca'; // red-200
+
+                        btnAuth.onmouseover = () => btnAuth.style.backgroundColor = '#fecaca';
+                        btnAuth.onmouseout = () => btnAuth.style.backgroundColor = '#fee2e2';
+
+                        btnAuth.onclick = async ()=>{ 
+                             if(!confirm(`¿Bloquear acceso al usuario ${u.user}?`)) return;
+                             setLoading(true, 'Revocando...');
+                             try{
+                                const body = new URLSearchParams({ action: 'revokeUser', targetUser: u.user });
+                                await fetch(GAS_URL, {method:'POST', body:body});
+                                actualizarUsuariosAdmin();
+                             }catch(e){ alert('Error: '+e.message); }
+                             finally{ setLoading(false); }
+                        };
+                    }
+                    td3.appendChild(btnAuth); 
+                    
+                    tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); 
+                    tbody.appendChild(tr);  
+                });
+            } else {
+                tbody.innerHTML='<tr><td colspan="3" style="color:#ef4444; text-align:center;">Error al cargar usuarios o sin permisos.</td></tr>';
+            }
+        } catch(e){
+            console.error('Error fetching users', e);
+            tbody.innerHTML='<tr><td colspan="3" style="color:#ef4444; text-align:center;">Error de conexión</td></tr>';
+        }
+    }
+    function renderLogTable(rows){
+        const tbody = document.querySelector('#tablaLogAdmin tbody');
+        if(!tbody) return;
+        tbody.innerHTML = '';
+
+        if(!rows || rows.length === 0){
+            tbody.innerHTML='<tr><td colspan="4" style="text-align:center; padding:20px; color:#64748b;">No hay registros para mostrar.</td></tr>';
+            return;
+        }
+
+        rows.forEach(l => {
+            const tr=document.createElement('tr');
+            
+            // Format Date
+            let dateStr = l.fecha;
+            try { 
+                const d = new Date(l.fecha); 
+                if(!isNaN(d.getTime())) {
+                    dateStr = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                }
+            } catch(e){}
+
+            const td1=document.createElement('td'); 
+            td1.setAttribute('data-label', 'Fecha');
+            td1.innerHTML = `<span style="color:#475569; font-size:0.85rem;">${dateStr}</span>`;
+            
+            const td2=document.createElement('td'); 
+            td2.setAttribute('data-label', 'Usuario');
+            td2.innerHTML = `<span style="font-weight:600; color:#1e293b;">${l.usuario || 'Anónimo'}</span>`;
+            
+            const td3=document.createElement('td'); 
+            td3.setAttribute('data-label', 'Acción');
+            let actionColor = '#334155';
+            const act = (l.accion||'').toLowerCase();
+            if(act.includes('login')) actionColor = '#16a34a';
+            else if(act.includes('inventario') || act.includes('sincro')) actionColor = '#2563eb';
+            else if(act.includes('admin') || act.includes('rol')) actionColor = '#d97706';
+            
+            td3.innerHTML = `<span style="color:${actionColor}; font-weight:500;">${l.accion || '-'}</span>`;
+
+            const td4=document.createElement('td'); 
+            td4.setAttribute('data-label', 'Detalles');
+            td4.innerText = l.detalles || ''; 
+            td4.style.color='#64748b'; 
+            td4.style.fontSize='0.85rem'; 
+
+            tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(td4);
+            tbody.appendChild(tr); 
+        });
+    }
+
+    async function actualizarLogAdmin(){
+        const tbody = document.querySelector('#tablaLogAdmin tbody');
+        if(tbody) tbody.innerHTML='<tr><td colspan="4" style="text-align:center; padding:20px; color:#64748b;">Cargando bitácora del servidor...</td></tr>';
+        
+        try {
+            const body = new URLSearchParams({ action: 'getLog' });
+            const res = await fetch(GAS_URL, { method: 'POST', body: body });
+            const data = await res.json();
+            
+            if(data.ok && Array.isArray(data.log)){
+                // Update global log variable for export/search
+                log = data.log;
+                renderLogTable(log);
+            } else {
+                 if(tbody) tbody.innerHTML='<tr><td colspan="4" style="text-align:center; color:#ef4444; padding:20px;">No se pudo obtener la bitácora.</td></tr>';
+            }
+        } catch(e){
+            console.error('Error log', e);
+            if(tbody) tbody.innerHTML='<tr><td colspan="4" style="text-align:center; color:#ef4444; padding:20px;">Error de conexión.</td></tr>';
+        }
+    }
 
     try{
         const exportLogBtn = document.getElementById('exportLogCSV');
-        if(exportLogBtn) exportLogBtn.addEventListener('click', ()=>{ let csv='Fecha,Usuario,Accion\n'; log.forEach(l=> csv += `${l.fecha},${l.usuario},${l.accion}\n`); const a=document.createElement('a'); a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv); a.download='bitacora_bodega.csv'; a.click(); });
+        if(exportLogBtn) exportLogBtn.addEventListener('click', ()=>{ 
+            let csv='Fecha,Usuario,Accion,Detalles\n'; 
+            log.forEach(l=> {
+                // Escape commas and quotes for CSV
+                const clean = (txt) => {
+                    if(!txt) return '';
+                    let s = String(txt).replace(/"/g, '""');
+                    if(s.includes(',') || s.includes('\n')) return `"${s}"`;
+                    return s;
+                };
+                csv += `${clean(l.fecha)},${clean(l.usuario)},${clean(l.accion)},${clean(l.detalles)}\n`;
+            }); 
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a=document.createElement('a'); 
+            a.href=url; 
+            a.download='bitacora_bodega.csv'; 
+            a.click(); 
+        });
         else console.warn('exportLogCSV button missing');
+
+        // Log Search Logic
+        const searchLog = document.getElementById('searchLog');
+        if(searchLog) {
+            searchLog.addEventListener('input', (e) => {
+                 const term = (e.target.value || '').toLowerCase();
+                 const filtered = log.filter(l => 
+                     (l.usuario||'').toLowerCase().includes(term) ||
+                     (l.accion||'').toLowerCase().includes(term) || 
+                     (l.detalles||'').toLowerCase().includes(term)
+                 );
+                 renderLogTable(filtered);
+            });
+        }
 
         if(!categoriaSel) console.error('categoriaSel missing');
         categoriaSel.addEventListener('change', async ()=>{ 
             console.log('categoria changed to',categoriaSel.value); 
             formArea.classList.add('hidden'); 
+
+            // Handle Vidrio Controls visibility
+            const vCtrl = document.getElementById('vidrioControls');
+            if(vCtrl){
+                if(categoriaSel.value === 'vidrio'){
+                    vCtrl.style.display = 'flex';
+                    populateVidrioTypes(); 
+                } else {
+                    vCtrl.style.display = 'none';
+                }
+            }
             
             // 1. Render local data immediately (Instant UI)
             populateFilterOptions(categoriaSel.value); 
@@ -1384,6 +3389,9 @@
 
                 scanDetails.innerHTML = detailsHtml;
                 scanQty.value = 1;
+                // clear comment
+                const cm = document.getElementById('scanComment'); if(cm) cm.value='';
+                
                 scanQty.focus();
                 
                 // Play beep
@@ -1454,17 +3462,21 @@
             
             const q = parseInt(scanQty.value) || 0;
             if(q <= 0) return alert('Cantidad inválida');
+
+            // read comment
+            const commentInput = document.getElementById('scanComment');
+            const comment = commentInput ? commentInput.value.trim() : '';
             
             const item = currentScannedItem;
             const cat = currentScannedCat;
             const actionName = isEntry ? 'Entrada' : 'Salida';
             
-            setLoading(true, `Procesando ${actionName}...`, true);
+            setLoading(true, `Procesando ${actionName}...`, false);
             try{
                 // 1. Fetch fresh data
                 const freshItem = await loadItemRemote(cat, item.codigo);
                 if(!freshItem){
-                    alert('Error: El producto no existe en el servidor.');
+                    showNotification('Error: El producto no existe en el servidor.', 'error');
                     resetScannerUI();
                     return;
                 }
@@ -1476,15 +3488,15 @@
                     newQty = currentStock + q;
                 } else {
                     if(currentStock < q){
-                        alert(`Stock insuficiente. Stock real: ${currentStock}`);
+                        showNotification(`Stock insuficiente. Stock real: ${currentStock}`, 'error');
                         resetScannerUI();
                         return;
                     }
                     newQty = currentStock - q;
                 }
                 
-                // 2. Update
-                await updateQuantityRemote(cat, freshItem, newQty);
+                // 2. Update (pass comment)
+                await updateQuantityRemote(cat, freshItem, newQty, comment);
                 
                 // 3. Update local
                 item.cantidad = newQty;
@@ -1492,12 +3504,12 @@
                 if(mainItem) mainItem.cantidad = newQty;
                 renderTable(categoriaSel.value, busqueda.value);
                 
-                alert(`${actionName} registrada correctamente. Nuevo stock: ${newQty}`);
+                showNotification(`${actionName} registrada correctamente. Nuevo stock: ${newQty}`, 'success');
                 resetScannerUI();
                 
             }catch(e){
                 console.error(e);
-                alert('Error: ' + e.message);
+                showNotification('Error: ' + e.message, 'error');
                 resetScannerUI();
             } finally {
                 setLoading(false);
@@ -1663,13 +3675,45 @@
         applySearchBtn.addEventListener('click', ()=>{ applyAdvancedSearch(); });
         cancelSearchBtn.addEventListener('click', ()=>{ cancelSearch(); });
         btnNew.addEventListener('click', ()=>{ console.log('btnNew clicked for',categoriaSel.value); const catSel = categoriaSel.value; if(!catSel || catSel==='todas'){ alert('Seleccione una categoría específica antes de agregar un producto.'); return; } renderForm(catSel); });
-        btnLogout.addEventListener('click', ()=>{ try{ localStorage.removeItem('activo'); location.href='index.html'; }catch(e){ console.error('logout error',e); } });
+        // btnLogout removed replaced by simple link
+        // btnLogout.addEventListener('click', ()=>{ try{ localStorage.removeItem('activo'); localStorage.removeItem('rol'); location.href='index.html'; }catch(e){ console.error('logout error',e); } });
+        
+        // Admin Panel Toggle Logic
+        if(btnToggleAdmin) btnToggleAdmin.addEventListener('click', toggleAdminPanel);
+        if(btnCloseAdmin) btnCloseAdmin.addEventListener('click', toggleAdminPanel);
+
     }catch(err){ console.error('Error wiring events',err); }
+
+    function toggleAdminPanel(){
+        const adminPanel = document.getElementById('adminPanel');
+        // Removed button style manipulation for cleaner UI
+        
+        if(!adminPanel) return;
+
+        if(adminPanel.classList.contains('hidden')){
+            adminPanel.classList.remove('hidden');
+            showAdminTab('usuarios');
+        } else {
+            adminPanel.classList.add('hidden');
+        }
+    }
 
     // --- Init ---
     if(!activo){ alert('No estás autenticado'); location.href='index.html'; }
     usuarioActivoEl.innerText = activo;
-    if(activo==='admin'){ adminPanel.classList.remove('hidden'); actualizarUsuariosAdmin(); actualizarLogAdmin(); }
+    
+    // Apply Role Permissions immediately
+    applyRolePermissions();
+    
+    // Admin Button/Panel initialization
+    if(activeRole === 'administrador' || activo === 'admin'){ 
+        // Show the toggle button
+        if(btnToggleAdmin) btnToggleAdmin.classList.remove('hidden');
+        
+        // Preload admin data but keep panel closed (modal)
+        actualizarUsuariosAdmin(); 
+        actualizarLogAdmin(); 
+    }
     // populate filter options and initial render (protegido)
     try{
         populateFilterOptions(categoriaSel.value);
@@ -1713,6 +3757,25 @@
     }
 
     </script>
+
+    <!-- Transaction Modal -->
+    <div id="transactionModal" class="hidden" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9000;display:flex;align-items:center;justify-content:center;">
+        <div style="background:white;padding:20px;border-radius:6px;width:90%;max-width:400px;box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+            <h3 id="transTitle" style="margin-top:0">Movimiento de inventario</h3>
+            <div style="margin-bottom:15px">
+                <label style="display:block;margin-bottom:5px;font-weight:600">Cantidad</label>
+                <input type="number" id="transQty" class="form-control" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;font-size:1.1rem;" min="1" inputmode="numeric">
+            </div>
+            <div style="margin-bottom:20px">
+                <label style="display:block;margin-bottom:5px;font-weight:600">Comentario (opcional)</label>
+                <textarea id="transComment" class="form-control" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;resize:none" rows="2" placeholder="Motivo, cliente, proyecto..."></textarea>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:10px">
+                <button id="transCancel" class="btn btn-outline" style="min-width:80px">Cancelar</button>
+                <button id="transConfirm" class="btn btn-primary" style="min-width:80px">Confirmar</button>
+            </div>
+        </div>
+    </div>
 
 </body>
 </html>

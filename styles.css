@@ -308,28 +308,44 @@ table {
 }
 
 th, td {
-    padding: 12px 16px;
+    padding: 8px 10px; /* Reducir padding para más espacio */
     text-align: left;
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 300px; /* Evitar columnas infinitas */
 }
 
 th {
-    background: #f1f5f9;
-    color: var(--primary);
-    font-weight: 700;
+    background: #f8fafc; /* Ligeramente más claro */
+    color: var(--text-light); /* Texto un poco más suave */
+    font-weight: 600;
     font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     position: sticky;
     top: 0;
     z-index: 10;
+    white-space: nowrap; /* Encabezados siempre en una línea */
 }
 
 td {
-    font-size: 0.9rem;
+    font-size: 0.85rem; /* Un poco más pequeño */
     color: var(--text);
     vertical-align: middle;
+}
+
+/* Permitir wrap en móvil */
+@media (max-width: 640px) {
+    th, td {
+        white-space: normal;
+        max-width: none;
+        padding: 6px 8px; /* Aún más compacto en móvil */
+    }
+    
+    /* Force font size down if needed */
+    td { font-size: 0.8rem; }
 }
 
 tr:last-child td {
@@ -347,15 +363,23 @@ tbody tr:hover td {
 /* Actions & Icons */
 .actions {
     display: flex;
-    gap: 6px;
+    gap: 8px;
+    align-items: center;
+    justify-content: flex-start; /* Align left to match text, or center? User said "rompen lineas", probably wrapping. Center is usually better for actions. LETS DO CENTER */
+    justify-content: center;
 }
 
 .actions button {
-    padding: 6px 10px;
-    font-size: 0.8rem;
-    border-radius: 4px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    border-radius: 6px;
     cursor: pointer;
     transition: all 0.2s;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    line-height: 1.2;
 }
 
 .icon { width: 20px; height: 20px; }
@@ -963,4 +987,108 @@ tbody tr:hover td {
         justify-content: center;
     }
 }
+
+
+/* Role-based Visibility */
+.role-visor table th:last-child,
+.role-visor table .actions-cell,
+.role-visor .btn-delete, 
+.role-visor .btn-entry, 
+.role-visor .btn-exit,
+.role-visor #btnNew,
+.role-visor #adminPanel,
+.role-visor .admin-only,
+.role-visor .btn-outline[title="Actualizar datos"] { /* Refresh is okay */
+    /* display: none !important; */
+}
+
+.role-visor #btnNew,
+.role-visor #adminPanel,
+.role-visor .admin-only {
+    display: none !important;
+}
+
+/* Visor can't see Actions column */
+.role-visor table th:last-child,
+.role-visor table .actions-cell {
+    display: none !important;
+}
+
+.role-editor #adminPanel,
+.role-editor .admin-only {
+    display: none !important;
+}
+
+/* Notification Styles */
+#notification-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 99999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+}
+
+.notification {
+    background: #fff;
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    min-width: 300px;
+    max-width: 450px;
+    pointer-events: auto;
+    animation: slideIn 0.3s ease-out forwards;
+    border-left: 4px solid #3b82f6;
+}
+
+.notification.error { border-left-color: #ef4444; }
+.notification.success { border-left-color: #10b981; }
+.notification.warning { border-left-color: #f59e0b; }
+
+.notification-content {
+    flex: 1;
+}
+
+.notification-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-bottom: 4px;
+    color: #1e293b;
+}
+
+.notification-message {
+    font-size: 0.85rem;
+    color: #64748b;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.notification-close {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 0;
+    font-size: 1.25rem;
+    line-height: 1;
+}
+
+.notification-close:hover {
+    color: #475569;
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateX(100%); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes fadeOut {
+    to { opacity: 0; transform: translateX(100%); }
+}
+
 

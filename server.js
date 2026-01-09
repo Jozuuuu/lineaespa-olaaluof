@@ -34,9 +34,9 @@ const USERS_FILE = path.join(DATA_DIR, 'usuarios_server.json');
 const LOG_FILE = path.join(DATA_DIR, 'log_server.json');
 
 // Optional: Apps Script endpoint to forward items (set your deployed exec URL)
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbwRpRM_SnH7p0_2DS4T4HHKjYuQnUpYVBZgqyr5-KSPVrr79UpUdtMDHfln4HVUlu73WA/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbz9ar2-nOzV2D433ttCRx7qiKckG8dGGsHH-VV2x_aa-_oicE_WLdmvotPbRVAPmqbC4Q/exec';
 // Map server categories to inventory IDs expected by Apps Script
-const CATEGORY_TO_INVENTORY = { aluminio: '1', herrajes: '2', vidrio: '3', insumos: '4' };
+const CATEGORY_TO_INVENTORY = { aluminio: '1', herrajes: '2', vidrio: '3', insumos: '4', andamiaje: '5' };
 
 function readJson(file, fallback){ try{ if(fs.existsSync(file)) return JSON.parse(fs.readFileSync(file,'utf8')||'{}'); }catch(e){ console.error('readJson error',e); } return fallback; }
 function writeJson(file, obj){ fs.writeFileSync(file, JSON.stringify(obj,null,2),'utf8'); }

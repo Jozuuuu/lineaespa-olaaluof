@@ -1,38 +1,139 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Catálogo técnico — Aluoferta</title>
-<link rel="icon" href="img/aluoferta_logo.png">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Iniciar Sesión - Aluoferta</title>
 <link rel="stylesheet" href="styles.css">
+<script>
+    // Redirect if already logged in
+    if(localStorage.getItem('activo')){
+        window.location.href = 'menu.html';
+    }
+</script>
 </head>
 <body class="centered">
-<div class="container-sm card">
-  <img src="https://aluoferta.com/wp-content/uploads/2021/03/logo-aluoferta.png" alt="Aluoferta" class="logo" onerror="this.src='img/aluoferta_logo.png'">
-  <h1 class="title">Catálogo Técnico</h1>
-  <p class="lead">Herramientas y documentación</p>
 
-  <div class="actions flex-col">
-    <a class="btn btn-primary" href="tecnico.html">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v6h6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 13H8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 17H8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 9H8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      PDF Técnico
-    </a>
-
-    <a class="btn btn-outline" href="descuentos.html">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/><path d="m14.5 12.5 2-2"/><path d="m11.5 9.5 2-2"/><path d="m8.5 6.5 2-2"/><path d="m17.5 15.5 2-2"/></svg>
-      Calculadora de Descuentos
-    </a>
-
-    <a class="btn btn-outline" href="indexinv.html">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.27 6.96 12 12.01l8.73-5.05" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 22.08V12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      Sistema de Inventarios
-    </a>
-  </div>
-
-  <div class="footer">
-    © 2024 Aluoferta — Uso interno
-  </div>
+<div class="container-sm card" id="login">
+    <img src="https://aluoferta.com/wp-content/uploads/2021/03/logo-aluoferta.png" alt="Aluoferta Logo" class="logo" onerror="this.src='img/aluoferta_logo.png'">
+    <h2 class="text-center">Iniciar Sesión</h2>
+    <div class="control-group">
+        <input id="loginUser" placeholder="Usuario">
+        <input id="loginPass" type="password" placeholder="Contraseña">
+    </div>
+    
+    <button onclick="login()" class="btn btn-primary w-100 mt-4">Entrar</button>
+    
+    <p id="loginMsg" class="text-center mt-4" style="color: var(--danger);"></p>
+    
+    <div class="footer">
+        ¿No tienes cuenta? <a onclick="toggleView()" style="cursor: pointer;">Regístrate aquí</a>
+    </div>
 </div>
+
+<div class="container-sm card hidden" id="registro">
+    <img src="https://aluoferta.com/wp-content/uploads/2021/03/logo-aluoferta.png" alt="Aluoferta Logo" class="logo" onerror="this.src='img/aluoferta_logo.png'">
+    <h2 class="text-center">Solicitar Acceso</h2>
+    <div class="control-group">
+        <input id="regUser" placeholder="Usuario deseado">
+        <input id="regPass" type="password" placeholder="Contraseña">
+    </div>
+    
+    <button onclick="registrar()" class="btn btn-primary w-100 mt-4">Enviar Solicitud</button>
+    
+    <div class="footer">
+        ¿Ya tienes cuenta? <a onclick="toggleView()" style="cursor: pointer;">Inicia sesión</a>
+    </div>
+</div>
+
+<script>
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbz9ar2-nOzV2D433ttCRx7qiKckG8dGGsHH-VV2x_aa-_oicE_WLdmvotPbRVAPmqbC4Q/exec';
+
+const loginDiv = document.getElementById('login');
+const registroDiv = document.getElementById('registro');
+const loginUser = document.getElementById('loginUser');
+const loginPass = document.getElementById('loginPass');
+const loginMsg = document.getElementById('loginMsg');
+const regUser = document.getElementById('regUser');
+const regPass = document.getElementById('regPass');
+
+function hash(txt){ return btoa(unescape(encodeURIComponent(txt))); }
+
+function toggleView(){
+    loginDiv.classList.toggle('hidden');
+    registroDiv.classList.toggle('hidden');
+    loginMsg.innerText = '';
+}
+
+async function registrar(){
+ let u=regUser.value.trim(),p=regPass.value;
+ if(!u||!p) return alert("Por favor complete todos los campos");
+ 
+ try {
+    const hashed = hash(p);
+    const body = new URLSearchParams({ action: 'register', user: u, pass: hashed }).toString();
+    const res = await fetch(GAS_URL, { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body 
+    });
+    const data = await res.json();
+    
+    if(data.error) {
+        alert("Error: " + data.error);
+    } else {
+        alert("Solicitud enviada. Contacte al administrador para aprobación.");
+        toggleView();
+    }
+ } catch(e) {
+    console.error(e);
+    alert("Error de conexión");
+ }
+}
+
+async function login(){
+ try{
+  const u=loginUser.value.trim(),p=loginPass.value;
+  if(!u || !p) { loginMsg.innerText="Complete los campos"; return; }
+  
+  loginMsg.innerText = "Verificando...";
+  
+  const hashed = hash(p);
+  const body = new URLSearchParams({ action: 'login', user: u, pass: hashed }).toString();
+  
+  const res = await fetch(GAS_URL, { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body 
+  });
+  const data = await res.json();
+  
+  if(data.error){
+      loginMsg.innerText = data.error;
+  } else if(data.ok){
+      localStorage.setItem('activo', data.user);
+      localStorage.setItem('rol', data.role);
+      window.location.href='menu.html';
+  }
+ }catch(err){
+  console.error(err);
+  loginMsg.innerText='Error de conexión';
+ }
+}
+
+// Allow Enter key to login
+function handleLoginKey(e) {
+    if (e.key === 'Enter') login();
+}
+document.getElementById('loginPass').addEventListener('keyup', handleLoginKey);
+document.getElementById('loginUser').addEventListener('keyup', handleLoginKey);
+
+// Allow Enter key to register
+function handleRegKey(e) {
+    if (e.key === 'Enter') registrar();
+}
+document.getElementById('regPass').addEventListener('keyup', handleRegKey);
+</script>
 </body>
 </html>
+

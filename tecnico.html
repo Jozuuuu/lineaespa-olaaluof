@@ -3,30 +3,257 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PDF técnico — Aluoferta</title>
+<title>Documentación Técnica — Aluoferta</title>
+<link rel="icon" href="img/aluoferta_logo.png">
 <link rel="stylesheet" href="styles.css">
+<script>
+    if(!localStorage.getItem('activo')){
+        window.location.href = 'index.html';
+    }
+</script>
+<style>
+    /* Dashboard Theme Integration */
+    .dashboard-container {
+        width: 100%;
+        max-width: 1000px;
+        animation: fadeIn 0.5s ease-out;
+    }
+    
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .dashboard-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: var(--card-bg);
+        padding: 24px 32px;
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        border: 1px solid var(--border);
+        margin-bottom: 32px;
+        flex-wrap: wrap;
+        gap: 20px;
+    }
+    
+    .header-branding {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+    }
+
+    .header-logo {
+        height: 48px;
+        width: auto;
+    }
+
+    .welcome-text h1 {
+        margin: 0;
+        font-size: 1.75rem;
+        color: var(--primary);
+        font-weight: 800;
+        letter-spacing: -0.025em;
+    }
+    
+    .welcome-text p {
+        margin: 6px 0 0 0;
+        color: var(--text-light);
+        font-size: 1rem;
+    }
+
+    .doc-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 24px;
+        margin-bottom: 32px;
+    }
+
+    .doc-card {
+        background: var(--card-bg);
+        border-radius: var(--radius);
+        padding: 32px;
+        text-decoration: none;
+        color: inherit;
+        border: 1px solid var(--border);
+        transition: var(--transition);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .doc-card:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--shadow-lg);
+        border-color: var(--accent);
+    }
+
+    .icon-wrapper {
+        width: 80px;
+        height: 80px;
+        background: #eff6ff;
+        border-radius: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 20px;
+        color: var(--accent);
+        transition: var(--transition);
+    }
+
+    .doc-card:hover .icon-wrapper {
+        background: var(--accent);
+        color: white;
+        transform: scale(1.1) rotate(-3deg);
+    }
+
+    .doc-title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--primary);
+        margin-bottom: 8px;
+    }
+
+    .doc-desc {
+        font-size: 0.9rem;
+        color: var(--text-light);
+        margin-bottom: 20px;
+        line-height: 1.5;
+    }
+
+    .download-badge {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--accent);
+        background: #eff6ff;
+        padding: 6px 12px;
+        border-radius: 20px;
+        transition: var(--transition);
+    }
+
+    .doc-card:hover .download-badge {
+        background: var(--primary);
+        color: white;
+    }
+
+    .system-info {
+        background: #fffbeb;
+        border: 1px solid #fcd34d;
+        color: #92400e;
+        padding: 16px;
+        border-radius: var(--radius);
+        font-size: 0.9rem;
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        line-height: 1.5;
+    }
+
+    /* Button consistent with other pages */
+    .btn-outline {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: white;
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 10px 16px;
+        border-radius: var(--radius);
+        text-decoration: none;
+        font-weight: 600;
+        transition: var(--transition);
+        font-size: 0.9rem;
+    }
+    .btn-outline:hover {
+        background: var(--bg);
+        border-color: var(--text-light);
+    }
+
+    @media (max-width: 640px) {
+        .dashboard-header {
+            flex-direction: column;
+            align-items: stretch;
+            text-align: center;
+        }
+    }
+</style>
 </head>
 <body class="centered">
-<div class="container-sm card">
-  <div class="header-bar">
-    <img src="img/aluoferta_logo.png" alt="Aluoferta" class="logo" onerror="this.src='img/aluoferta_logo.png'">
-    <a href="index.html" class="btn btn-outline" style="white-space:nowrap">Volver al inicio</a>
-  </div>
-  <h1 class="title">Catálogo técnico — Aluoferta</h1>
-  <p class="lead">Elige el PDF que deseas abrir</p>
 
-  <div class="actions flex-col">
-    <a class="btn btn-primary" href="docs/Catalogo_1400.pdf">PDF 1400</a>
-    <a class="btn btn-primary" href="docs/Catalogo_3500.pdf">PDF 3500</a>
-    <a class="btn btn-primary" href="docs/Catalogo_4600.pdf">PDF 4600</a>
-  </div>
+<div class="dashboard-container">
+    
+    <div class="dashboard-header">
+        <div class="header-branding">
+            <img src="https://aluoferta.com/wp-content/uploads/2021/03/logo-aluoferta.png" alt="Aluoferta" class="header-logo" onerror="this.src='img/aluoferta_logo.png'">
+            <div class="welcome-text">
+                <h1>Documentación Técnica</h1>
+                <p>Catálogos digitales y fichas técnicas</p>
+            </div>
+        </div>
+        <a href="menu.html" class="btn-outline">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+            Volver al Menú
+        </a>
+    </div>
 
-  <div class="hint mt-4">
-    Coloca los archivos en:
-    <strong>c:\Users\falco\OneDrive\Escritorio\LEO\aluminio\Discounts\docs\</strong>
-    con los nombres: <code>Catalogo_1400.pdf</code>, <code>Catalogo_3500.pdf</code>, <code>Catalogo_4600.pdf</code>.
-  </div>
-  <div class="footer">© Aluoferta</div>
+    <div class="doc-grid">
+        
+        <!-- Catalogo 1400 -->
+        <a href="docs/Catalogo_1400.pdf" class="doc-card">
+            <div class="icon-wrapper">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15l3 3 3-3"/></svg>
+            </div>
+            <div class="doc-title">Línea 1400</div>
+            <div class="doc-desc">Sistema de proyección y abatible. Detalles de perfiles, cortes y ensambles.</div>
+            <div class="download-badge">
+                <span>Ver PDF</span>
+            </div>
+        </a>
+
+        <!-- Catalogo 3500 -->
+        <a href="docs/Catalogo_3500.pdf" class="doc-card">
+            <div class="icon-wrapper">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15l3 3 3-3"/></svg>
+            </div>
+            <div class="doc-title">Línea 3500</div>
+            <div class="doc-desc">Sistema corredizo tradicional. Catálogo completo de secciones y herrajes.</div>
+            <div class="download-badge">
+                <span>Ver PDF</span>
+            </div>
+        </a>
+
+        <!-- Catalogo 4600 -->
+        <a href="docs/Catalogo_4600.pdf" class="doc-card">
+            <div class="icon-wrapper">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15l3 3 3-3"/></svg>
+            </div>
+            <div class="doc-title">Línea 4600</div>
+            <div class="doc-desc">Serie perimetral y monumental. Guía técnica de armado y mecanizado.</div>
+            <div class="download-badge">
+                <span>Ver PDF</span>
+            </div>
+        </a>
+
+    </div>
+
+    <div class="system-info">
+        <svg  style="flex-shrink:0" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <div>
+            <strong>Nota para el administrador:</strong><br>
+            Asegúrate de que los archivos PDF estén ubicados en la carpeta <code>docs/</code> con los nombres correspondientes: 
+            <em>Catalogo_1400.pdf</em>, <em>Catalogo_3500.pdf</em>, y <em>Catalogo_4600.pdf</em>.
+        </div>
+    </div>
+    
+    <div style="text-align:center; margin-top:40px; color:#94a3b8; font-size:0.9rem;">
+        © 2026 Aluoferta — Plataforma Interna v2.0
+    </div>
+
 </div>
+
 </body>
 </html>
