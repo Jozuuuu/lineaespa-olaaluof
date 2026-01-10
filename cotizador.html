@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Cotizador — Aluoferta</title>
+    <link rel="icon" href="img/aluoferta_logo.png">
+    <link rel="stylesheet" href="styles.css">
+    <!-- html2pdf for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script>
+        // Security Check
+        const activo = localStorage.getItem('activo');
+        const role = localStorage.getItem('rol');
+        if(!activo){
+            window.location.href = 'index.html';
+        }
+        if(role !== 'administrador' && role !== 'editor'){
+            alert('Acceso no autorizado.');
+            window.location.href = 'menu.html';
+        }
+    </script>
+    <style>
+        /* Specific Styles reusing variables */
+        .dashboard-container {
+            width: 100%;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            animation: fadeIn 0.5s ease-out;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--card-bg);
+            padding: 24px 32px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        
+        .header-branding { display: flex; align-items: center; gap: 20px; }
+        .header-logo { height: 48px; width: auto; }
+
+        .btn-outline {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: white;
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 10px 16px;
+            border-radius: var(--radius);
+            text-decoration: none;
+            font-weight: 600;
+            transition: var(--transition);
+            cursor: pointer;
+        }
+        .btn-outline:hover { background: var(--bg); }
+        
+        /* Quote Layout */
+        .quote-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+        
+        .card-panel {
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            padding: 24px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border);
+        }
+
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.9rem; color: var(--text); }
+        .form-control {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+        .form-control:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+
+        .items-header {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr auto;
+            gap: 10px;
+            padding: 10px;
+            background: #f8fafc;
+            border-bottom: 2px solid var(--border);
+            font-weight: 700;
+            color: var(--text-light);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+        }
+
+        .item-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr auto;
+            gap: 10px;
+            padding: 12px 10px;
+            border-bottom: 1px solid #f1f5f9;
+            align-items: center;
+        }
+        .item-row:last-child { border-bottom: none; }
+        
+        .btn-add {
+            background: var(--success);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: opacity 0.2s;
+        }
+        .btn-add:hover { opacity: 0.9; }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-remove {
+            color: #ef4444; /* red-500 */
+            background: #fee2e2;
+            border: none;
+            width: 32px; height: 32px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .total-section {
+            background: #f8fafc;
+            padding: 20px;
+            border-top: 1px solid var(--border);
+            text-align: right;
+            border-radius: 0 0 var(--radius) var(--radius);
+        }
+        .total-line {
+            display: flex; justify-content: flex-end; gap: 20px;
+            font-size: 1.1rem;
+            margin-bottom: 5px;
+        }
+        .grand-total {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--primary);
+        }
+
+        /* Print styles */
+        @media print {
+            body { padding: 0; background: white; }
+            .dashboard-container { max-width: 100%; box-shadow: none; border: none; padding: 0; }
+            .no-print { display: none !important; }
+            .dashboard-header { box-shadow: none; border: none; padding: 0; margin-bottom: 20px; }
+            .card-panel { box-shadow: none; border: 1px solid #ccc; }
+        }
+
+        @media (max-width: 768px) {
+            .quote-grid { grid-template-columns: 1fr; }
+            .items-header { display: none; } /* Hide headers on mobile */
+            .item-row { 
+                grid-template-columns: 1fr 1fr; 
+                grid-template-rows: auto auto auto;
+                gap: 5px;
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                margin-bottom: 10px;
+                background: white;
+            }
+            .item-row > *:nth-child(1) { grid-column: 1 / -1; font-weight: 600; } /* Description full width */
+            .item-row > *:last-child { grid-column: 2; grid-row: 3; justify-self: end; } /* Delete button */
+        }
+    </style>
+</head>
+<body class="centered">
+
+    <div class="dashboard-container" id="quoteArea">
+        
+        <!-- Header -->
+        <div class="dashboard-header">
+            <div class="header-branding">
+                <img src="https://aluoferta.com/wp-content/uploads/2021/03/logo-aluoferta.png" alt="Aluoferta" class="header-logo" onerror="this.src='img/aluoferta_logo.png'">
+                <div>
+                    <h1 style="margin:0; font-size:1.5rem; color:var(--primary);">Cotizador</h1>
+                    <p style="margin:0; color:var(--text-light); font-size:0.9rem;">Nueva cotización</p>
+                </div>
+            </div>
+            <div class="no-print">
+                <a href="menu.html" class="btn-outline">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+                    Volver
+                </a>
+            </div>
+        </div>
+
+        <div class="quote-grid">
+            <!-- Client Info -->
+            <div class="card-panel">
+                <h3 style="margin-top:0; color:var(--primary); margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px;">Datos del Cliente</h3>
+                <div class="form-group">
+                    <label>Nombre / Razón Social</label>
+                    <input type="text" id="clientName" class="form-control" placeholder="Ej. Juan Pérez">
+                </div>
+                <div class="form-group">
+                    <label>Teléfono</label>
+                    <input type="tel" id="clientPhone" class="form-control" placeholder="Ej. 55 1234 5678">
+                </div>
+                <div class="form-group">
+                    <label>Fecha</label>
+                    <input type="date" id="quoteDate" class="form-control">
+                </div>
+            </div>
+            
+            <!-- Quote Info (Company side) -->
+            <div class="card-panel">
+                 <h3 style="margin-top:0; color:var(--primary); margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px;">Información de Cotización</h3>
+                 <div class="form-group">
+                    <label>Folio (Opcional)</label>
+                    <input type="text" id="quoteFolio" class="form-control" value="COT-" readonly>
+                 </div>
+                 <div class="form-group">
+                    <label>Vendedor</label>
+                    <input type="text" id="salesRep" class="form-control" readonly>
+                 </div>
+                 <div class="form-group">
+                    <label>Vigencia</label>
+                    <select id="validity" class="form-control">
+                        <option value="5 días">5 días</option>
+                        <option value="15 días" selected>15 días</option>
+                        <option value="30 días">30 días</option>
+                    </select>
+                 </div>
+            </div>
+        </div>
+
+        <!-- Items Section -->
+        <div class="card-panel" style="padding:0; overflow:hidden;">
+            <div style="padding:20px; background:var(--bg); border-bottom:1px solid var(--border);" class="no-print">
+                <h3 style="margin:0; margin-bottom:15px;">Agregar Productos</h3>
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                    <input type="text" id="newItemDesc" class="form-control" style="flex:3; min-width:200px;" placeholder="Descripción del producto">
+                    <input type="number" id="newItemQty" class="form-control" style="flex:1; min-width:80px;" placeholder="Cant." value="1" min="1">
+                    <input type="number" id="newItemPrice" class="form-control" style="flex:1; min-width:100px;" placeholder="Precio Unit." min="0" step="0.01">
+                    <button id="addItemBtn" class="btn-add">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Agregar
+                    </button>
+                </div>
+            </div>
+
+            <div class="items-header">
+                <div>Descripción</div>
+                <div style="text-align:center">Cant.</div>
+                <div style="text-align:right">Precio Unit.</div>
+                <div style="text-align:right">Total</div>
+                <div class="no-print"></div>
+            </div>
+            
+            <div id="itemsContainer">
+                <!-- Items will go here -->
+                <div style="padding:40px; text-align:center; color:#94a3b8;" id="emptyMsg">No hay items en la cotización</div>
+            </div>
+
+            <div class="total-section">
+                <div class="total-line">
+                    <span>Subtotal:</span>
+                    <span id="subtotalVal">$0.00</span>
+                </div>
+                <div class="total-line" style="font-size:0.9rem; color:var(--text-light)">
+                    <span>IVA (16%):</span>
+                    <span id="ivaVal">$0.00</span>
+                </div>
+                <div class="total-line grand-total">
+                    <span>Total:</span>
+                    <span id="totalVal">$0.00</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div style="margin-top:30px; display:flex; justify-content:flex-end; gap:15px;" class="no-print">
+            <button onclick="window.location.reload()" class="btn-outline" style="color:#ef4444; border-color:#fee2e2;">
+                Nueva Cotización
+            </button>
+            <button onclick="generatePDF()" class="btn-primary">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                Descargar PDF
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // Init fields
+        document.getElementById('quoteDate').valueAsDate = new Date();
+        document.getElementById('quoteFolio').value = 'COT-' + Date.now().toString().slice(-6);
+        document.getElementById('salesRep').value = localStorage.getItem('activo') || 'Vendedor';
+
+        // State
+        let items = [];
+
+        // Elements
+        const descInput = document.getElementById('newItemDesc');
+        const qtyInput = document.getElementById('newItemQty');
+        const priceInput = document.getElementById('newItemPrice');
+        const itemsContainer = document.getElementById('itemsContainer');
+        const emptyMsg = document.getElementById('emptyMsg');
+
+        // Add Item Logic
+        document.getElementById('addItemBtn').addEventListener('click', () => {
+             const desc = descInput.value.trim();
+             const qty = parseFloat(qtyInput.value);
+             const price = parseFloat(priceInput.value);
+
+             if(!desc || !qty || isNaN(price)) {
+                 alert('Por favor complete descripción, cantidad y precio.');
+                 return;
+             }
+
+             items.push({ id: Date.now(), desc, qty, price, total: qty * price });
+             
+             // Reset inputs
+             descInput.value = '';
+             qtyInput.value = 1;
+             priceInput.value = '';
+             descInput.focus();
+
+             renderItems();
+        });
+
+        // Trigger Add on Enter in Price input
+        priceInput.addEventListener('keypress', (e)=>{
+            if(e.key === 'Enter') document.getElementById('addItemBtn').click();
+        });
+
+        function renderItems(){
+            itemsContainer.innerHTML = '';
+            if(items.length === 0){
+                itemsContainer.appendChild(emptyMsg);
+                emptyMsg.style.display = 'block';
+            } else {
+                items.forEach(item => {
+                    const row = document.createElement('div');
+                    row.className = 'item-row';
+                    row.innerHTML = `
+                        <div>${item.desc}</div>
+                        <div style="text-align:center">${item.qty}</div>
+                        <div style="text-align:right">$${item.price.toFixed(2)}</div>
+                        <div style="text-align:right; font-weight:600;">$${item.total.toFixed(2)}</div>
+                        <div class="no-print">
+                            <button class="btn-remove" onclick="removeItem(${item.id})">×</button>
+                        </div>
+                    `;
+                    itemsContainer.appendChild(row);
+                });
+            }
+            calculateTotals();
+        }
+
+        function removeItem(id){
+            items = items.filter(i => i.id !== id);
+            renderItems();
+        }
+
+        function calculateTotals(){
+            const subtotal = items.reduce((sum, item) => sum + item.total, 0);
+            const iva = subtotal * 0.16;
+            const total = subtotal + iva;
+
+            document.getElementById('subtotalVal').innerText = '$' + subtotal.toFixed(2);
+            document.getElementById('ivaVal').innerText = '$' + iva.toFixed(2);
+            document.getElementById('totalVal').innerText = '$' + total.toFixed(2);
+        }
+
+        function generatePDF(){
+            if(items.length === 0){ alert('Agregue productos antes de generar PDF.'); return; }
+            
+            const element = document.getElementById('quoteArea');
+            const clientName = document.getElementById('clientName').value || 'Cliente';
+            const folio = document.getElementById('quoteFolio').value;
+            
+            const opt = {
+              margin:       10,
+              filename:     `${folio}_${clientName}.pdf`,
+              image:        { type: 'jpeg', quality: 0.98 },
+              html2canvas:  { scale: 2 },
+              jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            // Use html2pdf lib
+            html2pdf().set(opt).from(element).save();
+        }
+    </script>
+</body>
+</html>

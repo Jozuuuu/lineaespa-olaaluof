@@ -307,14 +307,27 @@ table {
     background: white;
 }
 
+/* Zebra Striping & Hover for better contrast */
+tbody tr {
+    transition: background-color 0.15s ease;
+}
+
+tbody tr:nth-child(even) {
+    background-color: rgba(15, 23, 42, 0.08); /* Navy Blue with 8% opacity */
+}
+
+tbody tr:hover {
+    background-color: rgba(15, 23, 42, 0.20) !important; /* Navy Blue with 20% opacity */
+}
+
 th, td {
     padding: 8px 10px; /* Reducir padding para más espacio */
     text-align: left;
     border-bottom: 1px solid var(--border);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 300px; /* Evitar columnas infinitas */
+    white-space: normal; /* Modificado: permitir saltos de línea */
+    /* overflow: hidden; Removed to allow full view */
+    /* text-overflow: ellipsis; Removed to allow full view */
+    max-width: none; /* Modificado: quitar límite general */
 }
 
 th {

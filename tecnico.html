@@ -86,26 +86,27 @@
     .doc-card:hover {
         transform: translateY(-5px);
         box-shadow: var(--shadow-lg);
-        border-color: var(--accent);
+        border-color: var(--primary);
     }
 
     .icon-wrapper {
         width: 80px;
         height: 80px;
-        background: #eff6ff;
+        background: #f1f5f9;
         border-radius: 20px;
         display: flex;
         align-items: center;
         justify-content: center;
         margin-bottom: 20px;
-        color: var(--accent);
+        color: var(--primary);
         transition: var(--transition);
     }
 
     .doc-card:hover .icon-wrapper {
-        background: var(--accent);
+        background: var(--primary);
         color: white;
         transform: scale(1.1) rotate(-3deg);
+        box-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.3);
     }
 
     .doc-title {
@@ -128,8 +129,8 @@
         gap: 6px;
         font-size: 0.8rem;
         font-weight: 600;
-        color: var(--accent);
-        background: #eff6ff;
+        color: var(--primary);
+        background: #f1f5f9;
         padding: 6px 12px;
         border-radius: 20px;
         transition: var(--transition);
@@ -238,15 +239,6 @@
             </div>
         </a>
 
-    </div>
-
-    <div class="system-info">
-        <svg  style="flex-shrink:0" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <div>
-            <strong>Nota para el administrador:</strong><br>
-            Asegúrate de que los archivos PDF estén ubicados en la carpeta <code>docs/</code> con los nombres correspondientes: 
-            <em>Catalogo_1400.pdf</em>, <em>Catalogo_3500.pdf</em>, y <em>Catalogo_4600.pdf</em>.
-        </div>
     </div>
     
     <div style="text-align:center; margin-top:40px; color:#94a3b8; font-size:0.9rem;">

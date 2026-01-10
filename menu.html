@@ -13,115 +13,124 @@
     }
 </script>
 <style>
-    /* Estilos específicos del Dashboard que usan variables de styles.css */
+    /* Estilos mejorados del Dashboard */
     .dashboard-container {
         width: 100%;
-        max-width: 900px;
-        animation: fadeIn 0.5s ease-out;
+        max-width: 1000px;
+        animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        margin-top: 20px;
     }
     
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes slideUp { 
+        from { opacity: 0; transform: translateY(20px); } 
+        to { opacity: 1; transform: translateY(0); } 
+    }
 
     .dashboard-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        background: var(--card-bg);
-        padding: 24px 32px;
-        border-radius: var(--radius);
-        box-shadow: var(--shadow);
-        border: 1px solid var(--border);
-        margin-bottom: 32px;
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(10px);
+        padding: 30px 40px;
+        border-radius: 16px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+        border: 1px solid rgba(255,255,255,0.8);
+        margin-bottom: 40px;
         flex-wrap: wrap;
         gap: 20px;
-        position: relative; /* Para posicionamiento absoluto del logo si fuera necesario, aunque flexbox es mejor */
     }
 
-    /* Logo integration */
-    .header-logo {
-        height: 48px;
-        width: auto;
-        margin-right: 20px; 
-    }
-    
     .header-branding {
         display: flex;
         align-items: center;
+        gap: 20px;
+    }
+
+    .header-logo {
+        height: 54px;
+        width: auto;
+        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.05));
     }
 
     .welcome-text h1 {
         margin: 0;
-        font-size: 1.75rem;
+        font-size: 1.8rem;
         color: var(--primary);
         font-weight: 800;
-        letter-spacing: -0.025em;
+        letter-spacing: -0.03em;
+        line-height: 1.2;
     }
     
     .welcome-text p {
-        margin: 6px 0 0 0;
+        margin: 4px 0 0 0;
         color: var(--text-light);
-        font-size: 1rem;
+        font-size: 0.95rem;
+        font-weight: 500;
     }
 
     .user-pill {
         display: flex;
         align-items: center;
         gap: 12px;
-        background: var(--bg);
-        padding: 8px 16px 8px 8px;
+        background: #f8fafc;
+        padding: 6px 16px 6px 6px;
         border-radius: 50px;
         border: 1px solid var(--border);
-        transition: var(--transition);
+        box-shadow: inset 0 2px 4px 0 rgba(0,0,0,0.02);
     }
 
     .user-avatar {
-        width: 36px;
-        height: 36px;
-        background: var(--primary);
+        width: 40px;
+        height: 40px;
+        background: linear-gradient(135deg, var(--primary), #334155);
         color: white;
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
         font-weight: 700;
-        font-size: 16px;
+        font-size: 18px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }
 
     .logout-btn {
-        background: var(--card-bg);
+        background: white;
         border: 1px solid var(--border);
-        color: var(--danger);
-        font-weight: 600;
+        color: var(--text-light);
         cursor: pointer;
         padding: 10px;
-        border-radius: var(--radius);
+        border-radius: 12px;
         transition: var(--transition);
         display: flex;
         align-items: center;
         justify-content: center;
-        margin-left: 10px;
+        margin-left: 12px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
     }
     .logout-btn:hover {
         background: #fee2e2;
         border-color: #fca5a5;
+        color: var(--danger);
         transform: translateY(-2px);
+        box-shadow: 0 4px 6px rgba(220, 38, 38, 0.1);
     }
 
     .menu-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
         gap: 24px;
     }
 
     .menu-card {
-        background: var(--card-bg);
-        border-radius: var(--radius);
+        background: #ffffff;
+        border-radius: 16px;
         padding: 32px;
         text-decoration: none;
         color: inherit;
-        box-shadow: var(--shadow-sm);
-        border: 1px solid var(--border);
-        transition: var(--transition);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+        border: 1px solid rgba(226, 232, 240, 0.8);
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
         display: flex;
         flex-direction: column;
         align-items: flex-start;
@@ -130,78 +139,111 @@
     }
 
     .menu-card:hover {
-        transform: translateY(-5px);
-        box-shadow: var(--shadow-lg);
-        border-color: var(--accent);
+        transform: translateY(-6px);
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.03);
+        border-color: var(--primary);
     }
     
-    .menu-card::before {
-        content: '';
+    .menu-card::after {
+        content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%230f172a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='5' y1='12' x2='19' y2='12'%3E%3C/line%3E%3Cpolyline points='12 5 19 12 12 19'%3E%3C/polyline%3E%3C/svg%3E");
         position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 4px;
-        background: var(--border);
-        transition: var(--transition);
+        bottom: 32px;
+        right: 32px;
+        opacity: 0;
+        transform: translateX(-10px);
+        transition: all 0.3s ease;
     }
 
-    .menu-card:hover::before {
-        background: var(--accent);
+    .menu-card:hover::after {
+        opacity: 1;
+        transform: translateX(0);
     }
 
     .card-icon {
-        width: 56px;
-        height: 56px;
-        border-radius: 12px;
+        width: 64px;
+        height: 64px;
+        border-radius: 16px;
         display: flex;
         align-items: center;
         justify-content: center;
-        margin-bottom: 20px;
-        margin-top: 10px;
-        font-size: 24px;
+        margin-bottom: 24px;
+        font-size: 28px;
         transition: var(--transition);
-        background: var(--bg);
+        background: #f1f5f9;
         color: var(--primary);
     }
     
     .menu-card:hover .card-icon {
         background: var(--primary);
         color: white;
-        transform: scale(1.1);
+        transform: scale(1.05) rotate(-3deg);
+        box-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.3);
     }
 
     .card-title {
-        font-size: 1.35rem;
-        font-weight: 700;
+        font-size: 1.25rem;
+        font-weight: 800;
         color: var(--primary);
-        margin-bottom: 10px;
-        letter-spacing: -0.01em;
+        margin-bottom: 12px;
+        letter-spacing: -0.02em;
     }
 
     .card-desc {
         color: var(--text-light);
         font-size: 0.95rem;
         line-height: 1.6;
+        font-weight: 400;
+    }
+
+    /* Disabled State Styling */
+    .menu-card.disabled {
+        opacity: 0.6;
+        pointer-events: none;
+        filter: grayscale(1);
+        background: #f8fafc;
+        border-style: dashed;
+    }
+    
+    .menu-card.disabled::before {
+        content: '';
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        width: 24px;
+        height: 24px;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='11' width='18' height='11' rx='2' ry='2'%3E%3C/rect%3E%3Cpath d='M7 11V7a5 5 0 0 1 10 0v4'%3E%3C/path%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: center;
+        opacity: 0.5;
     }
 
     .menu-footer {
         text-align: center;
         margin-top: 60px;
-        color: var(--text-light);
+        color: #94a3b8;
         font-size: 0.85rem;
         font-weight: 500;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
     }
 
     @media (max-width: 640px) {
         .dashboard-header {
             flex-direction: column;
-            align-items: stretch;
             text-align: center;
             padding: 24px;
+            gap: 24px;
+        }
+        .header-branding {
+            flex-direction: column;
+            gap: 12px;
+        }
+        .header-logo {
+            margin-right: 0;
         }
         .user-pill {
-            justify-content: flex-start;
+            width: 100%;
+            justify-content: space-between;
         }
     }
 </style>
@@ -261,6 +303,33 @@
             <div class="card-desc">Biblioteca digital con catálogos, fichas técnicas y manuales de perfiles y herrajes.</div>
         </a>
 
+        <!-- Cotizador Card -->
+        <a href="cotizador.html" class="menu-card" id="cardCotizador">
+            <div class="card-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18h.01"/><path d="M8 18h.01"/><path d="M16 18h.01"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M12 10h.01"/><path d="M16 10h.01"/></svg>
+            </div>
+            <div class="card-title">Cotizador</div>
+            <div class="card-desc">Generación de presupuestos y cotizaciones para clientes.</div>
+        </a>
+
+        <!-- Gestor de Cuadrillas Card -->
+        <a href="cuadrillas.html" class="menu-card" id="cardCuadrillas">
+            <div class="card-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <div class="card-title">Gestor de Cuadrillas</div>
+            <div class="card-desc">Organización, asignación y seguimiento de equipos de instalación.</div>
+        </a>
+
+        <!-- Gestor de Obras Card -->
+        <a href="obras.html" class="menu-card" id="cardObras">
+            <div class="card-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4 8 4v14"/><path d="M17 21v-8.5"/><path d="M7 21v-8.5"/></svg>
+            </div>
+            <div class="card-title">Gestor de Obras</div>
+            <div class="card-desc">Administración de proyectos, avance de obras y recursos asignados.</div>
+        </a>
+
     </div>
 
     <div class="menu-footer">
@@ -281,12 +350,32 @@
     if(role === 'taller'){
         const invCard = document.getElementById('cardInventario');
         if(invCard) {
-            invCard.style.opacity = '0.5';
-            invCard.style.pointerEvents = 'none';
-            invCard.style.filter = 'grayscale(1)';
+            invCard.classList.add('disabled');
             invCard.title = 'Acceso restringido para Taller';
-            // Optional: Hide completely
-            // invCard.style.display = 'none'; 
+        }
+    }
+
+    // Role Limitation: 'cotizador' only for admin/editor
+    if(role !== 'administrador' && role !== 'editor'){
+        const cotCard = document.getElementById('cardCotizador');
+        if(cotCard) {
+            cotCard.classList.add('disabled');
+            cotCard.title = 'Acceso restringido (Solo Editores/Admin)';
+        }
+    }
+
+    // Role Limitation: 'cuadrillas' only for admin
+    if(role !== 'administrador'){
+        const cuadCard = document.getElementById('cardCuadrillas');
+        if(cuadCard) {
+            cuadCard.classList.add('disabled');
+            cuadCard.title = 'Acceso restringido (Solo Admin)';
+        }
+        
+        const obrasCard = document.getElementById('cardObras');
+        if(obrasCard) {
+            obrasCard.classList.add('disabled');
+            obrasCard.title = 'Acceso restringido (Solo Admin)';
         }
     }
 
