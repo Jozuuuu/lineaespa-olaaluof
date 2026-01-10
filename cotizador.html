@@ -207,7 +207,7 @@
                 <img src="https://aluoferta.com/wp-content/uploads/2021/03/logo-aluoferta.png" alt="Aluoferta" class="header-logo" onerror="this.src='img/aluoferta_logo.png'">
                 <div>
                     <h1 style="margin:0; font-size:1.5rem; color:var(--primary);">Cotizador</h1>
-                    <p style="margin:0; color:var(--text-light); font-size:0.9rem;">Nueva cotización</p>
+                    <p style="margin:0; color:var(--text-light); font-size:0.9rem;">Calculadora en Tiempo Real (Sheets)</p>
                 </div>
             </div>
             <div class="no-print">
@@ -236,70 +236,91 @@
                 </div>
             </div>
             
-            <!-- Quote Info (Company side) -->
+            <!-- Global Params (Required for Calculation) -->
             <div class="card-panel">
-                 <h3 style="margin-top:0; color:var(--primary); margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px;">Información de Cotización</h3>
-                 <div class="form-group">
-                    <label>Folio (Opcional)</label>
-                    <input type="text" id="quoteFolio" class="form-control" value="COT-" readonly>
+                 <h3 style="margin-top:0; color:var(--primary); margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px;">Parámetros Globales</h3>
+                 <p style="font-size:0.8rem; color:#64748b; margin-top:-10px;">Estos valores actualizan el catálogo completo.</p>
+                 
+                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                     <div class="form-group">
+                        <label>Ancho (m) *</label>
+                        <input type="number" id="globalWidth" class="form-control" placeholder="C3" step="0.01">
+                     </div>
+                     <div class="form-group">
+                        <label>Altura (m) *</label>
+                        <input type="number" id="globalHeight" class="form-control" placeholder="D3" step="0.01">
+                     </div>
                  </div>
-                 <div class="form-group">
-                    <label>Vendedor</label>
-                    <input type="text" id="salesRep" class="form-control" readonly>
+
+                 <!-- Extra Params for Cuadricula -->
+                 <div style="background:#f1f5f9; padding:10px; border-radius:6px; margin-top:10px;">
+                    <label style="font-size:0.8rem; font-weight:700; color:#475569; margin-bottom:5px; display:block;">Cuadrícula Española (Opcional)</label>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:5px;">
+                        <div>
+                             <label style="font-size:0.7rem;">Pzas Hueco</label>
+                             <input type="number" id="sqPzas" class="form-control" placeholder="A5" style="font-size:0.8rem; padding:5px;">
+                        </div>
+                        <div>
+                             <label style="font-size:0.7rem;">Claros H</label>
+                             <input type="number" id="sqClarosH" class="form-control" placeholder="C5" style="font-size:0.8rem; padding:5px;">
+                        </div>
+                        <div>
+                             <label style="font-size:0.7rem;">Claros V</label>
+                             <input type="number" id="sqClarosV" class="form-control" placeholder="D5" style="font-size:0.8rem; padding:5px;">
+                        </div>
+                    </div>
                  </div>
-                 <div class="form-group">
-                    <label>Vigencia</label>
-                    <select id="validity" class="form-control">
-                        <option value="5 días">5 días</option>
-                        <option value="15 días" selected>15 días</option>
-                        <option value="30 días">30 días</option>
-                    </select>
-                 </div>
-                 <div class="form-group">
-                    <label>Acabado Predeterminado</label>
-                    <select id="globalFinish" class="form-control" style="font-weight:600; color:var(--primary);">
-                        <option value="blanco">Natural / Blanco</option>
-                        <option value="electro">Electro</option>
-                        <option value="inox">Inox / Choco</option>
-                        <option value="hueso">Hueso</option>
-                        <option value="madera">Madera</option>
-                    </select>
-                    <small style="display:block; margin-top:5px; color:#64748b;">(Afecta a nuevos items agregados)</small>
-                 </div>
+                 
+                 <button id="btnCalculate" class="btn-primary" style="width:100%; margin-top:15px; justify-content:center;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                    Calcular Precios
+                 </button>
             </div>
         </div>
 
         <!-- Items Section -->
         <div class="card-panel" style="padding:0; overflow:hidden;">
             <div style="padding:20px; background:var(--bg); border-bottom:1px solid var(--border);" class="no-print">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                    <h3 style="margin:0;">Agregar Productos</h3>
-                    <button id="btnReloadPrices" class="btn-outline" style="font-size:0.8rem; padding:5px 10px;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
-                        Recargar Precios
-                    </button>
-                </div>
+                <h3 style="margin:0; margin-bottom:15px;">Selección de Productos</h3>
                 
-                <div id="loadingPrices" style="display:none; color:var(--primary); margin-bottom:10px; font-weight:600;">
-                    Cargando lista de precios desde Google Sheets...
+                <div id="loadingOverlay" style="display:none; text-align:center; padding:20px; color:var(--primary);">
+                    <div class="spinner" style="width:30px;height:30px;border-width:3px;margin:0 auto 10px auto;"></div>
+                    Calculando precios en servidor...
                 </div>
 
-                <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                    <div style="flex:3; min-width:250px; position:relative;">
-                        <input type="text" id="newItemDesc" class="form-control" list="productsList" placeholder="Buscar producto por código o nombre..." autocomplete="off">
-                        <datalist id="productsList"></datalist>
-                    </div>
-                    
-                    <input type="number" id="newItemQty" class="form-control" style="flex:1; min-width:80px;" placeholder="Cant." value="1" min="1">
-                    
-                    <div style="flex:1; min-width:120px; display:flex; flex-direction:column; gap:2px;">
-                         <input type="number" id="newItemPrice" class="form-control" placeholder="Precio Unit." min="0" step="0.01">
-                         <span id="priceHint" style="font-size:0.75rem; color:#64748b; text-align:right;"></span>
+                <div id="selectionArea" style="opacity:0.5; pointer-events:none;">
+                    <div class="form-group">
+                        <label>Acabado</label>
+                        <select id="itemFinish" class="form-control" style="font-weight:600; color:var(--primary); max-width:200px;">
+                            <option value="blanco">Natural / Blanco</option>
+                            <option value="electro">Electro</option>
+                            <option value="inox">Inox / Choco</option>
+                            <option value="hueso">Hueso</option>
+                            <option value="madera">Madera</option>
+                        </select>
                     </div>
 
-                    <button id="addItemBtn" class="btn-add">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Agregar
-                    </button>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+                        <div style="flex:3; min-width:250px;">
+                            <label>Producto</label>
+                            <input type="text" id="productSearch" class="form-control" list="productsDatalist" placeholder="Buscar..." disabled>
+                            <datalist id="productsDatalist"></datalist>
+                        </div>
+                        
+                        <div style="flex:1; min-width:80px;">
+                            <label>Cant.</label>
+                            <input type="number" id="itemQty" class="form-control" value="1" min="1">
+                        </div>
+                        
+                        <div style="flex:1; min-width:120px;">
+                             <label>Precio Unit.</label>
+                             <input type="text" id="displayPrice" class="form-control" readonly style="background:#f1f5f9; cursor:not-allowed;">
+                        </div>
+    
+                        <button id="addItemBtn" class="btn-add">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Agregar
+                        </button>
+                    </div>
                 </div>
             </div>
 

@@ -122,6 +122,12 @@ function doGet(e){
       }
       return ContentService.createTextOutput(JSON.stringify({ok:true, data:result})).setMimeType(ContentService.MimeType.JSON);
     }
+    
+    // --- NUEVO: Endpoint de Cotización ---
+    if(q.action === 'calculate') {
+      return ContentService.createTextOutput(JSON.stringify(calculatePrice(q)))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
 
     if(q.action === 'list' && q.inventory){
       const ss = SpreadsheetApp.openById(SHEET_ID);
@@ -834,4 +840,88 @@ function logToSheet(user, action, details){
     // Ignore logging errors to not break main flow
     console.error('Log error:', e);
   }
+}
+
+function calculatePrice(params) {
+  // Use the specific Spreadsheet ID for the pricing logic
+  const PRICE_SHEET_ID = '1hPFGd4BtTINl5fDyV3Gq8EBxlFDfY1mHjBFFvcNJ5a8'; 
+  const ss = SpreadsheetApp.openById(PRICE_SHEET_ID);
+  const sheet = ss.getSheets()[0]; // "1º Dios"
+
+  // Inputs
+  const width = parseFloat(params.ancho);
+  const height = parseFloat(params.altura);
+  
+  // Optional Cuadricula inputs
+  const pzas = params.pzas ? parseInt(params.pzas) : null;
+  const clarosH = params.clarosH ? parseInt(params.clarosH) : null;
+  const clarosV = params.clarosV ? parseInt(params.clarosV) : null;
+
+  if (isNaN(width) || isNaN(height)) {
+    return { ok: false, error: 'Ancho y Altura son requeridos' };
+  }
+
+  // --- Step 1: Input Data into Calculation Cells ---
+  sheet.getRange('C3').setValue(width);
+  sheet.getRange('D3').setValue(height);
+
+  // "Número de piezas en hueco en el A5, claros horizontal c5 y claros vertical d5"
+  if (pzas !== null) sheet.getRange('A5').setValue(pzas);
+  if (clarosH !== null) sheet.getRange('C5').setValue(clarosH);
+  if (clarosV !== null) sheet.getRange('D5').setValue(clarosV);
+
+  // Force recalculation
+  SpreadsheetApp.flush();
+
+  // --- Step 2: Read Results ---
+  const lastRow = sheet.getLastRow();
+  // Read from Row 8 downwards, Columns A to I (9 cols)
+  // Ensure we have data
+  if (lastRow < 8) return { ok: true, products: [] };
+  
+  const dataRange = sheet.getRange(8, 1, lastRow - 7, 9); 
+  const values = dataRange.getValues();
+  
+  const products = [];
+
+  values.forEach(row => {
+    const cve = row[0]; // Col A
+    const desc = row[1]; // Col B
+    
+    // Skip invalid rows
+    if (!cve && !desc) return;
+    if (String(cve).toLowerCase() === 'cve') return;
+
+    const getVal = (idx) => {
+      const v = row[idx];
+      if (typeof v === 'number') return v;
+      if (typeof v === 'string') {
+        return parseFloat(v.replace(/[$,]/g, '')) || 0;
+      }
+      return 0;
+    };
+
+    const pBlanco = getVal(4); // E
+    // Heuristic: If price is 0, ignore
+    if (pBlanco === 0 && getVal(5)===0) return;
+
+    products.push({
+      cve: String(cve),
+      desc: String(desc),
+      fullText: `${cve} - ${desc}`,
+      prices: {
+        blanco: pBlanco,
+        electro: getVal(5),
+        inox: getVal(6),
+        hueso: getVal(7),
+        madera: getVal(8)
+      }
+    });
+  });
+
+  return {
+    ok: true,
+    inputs: { width, height, pzas, clarosH, clarosV },
+    products: products
+  };
 }
