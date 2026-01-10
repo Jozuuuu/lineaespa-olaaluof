@@ -255,17 +255,48 @@
                         <option value="30 días">30 días</option>
                     </select>
                  </div>
+                 <div class="form-group">
+                    <label>Acabado Predeterminado</label>
+                    <select id="globalFinish" class="form-control" style="font-weight:600; color:var(--primary);">
+                        <option value="blanco">Natural / Blanco</option>
+                        <option value="electro">Electro</option>
+                        <option value="inox">Inox / Choco</option>
+                        <option value="hueso">Hueso</option>
+                        <option value="madera">Madera</option>
+                    </select>
+                    <small style="display:block; margin-top:5px; color:#64748b;">(Afecta a nuevos items agregados)</small>
+                 </div>
             </div>
         </div>
 
         <!-- Items Section -->
         <div class="card-panel" style="padding:0; overflow:hidden;">
             <div style="padding:20px; background:var(--bg); border-bottom:1px solid var(--border);" class="no-print">
-                <h3 style="margin:0; margin-bottom:15px;">Agregar Productos</h3>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <h3 style="margin:0;">Agregar Productos</h3>
+                    <button id="btnReloadPrices" class="btn-outline" style="font-size:0.8rem; padding:5px 10px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+                        Recargar Precios
+                    </button>
+                </div>
+                
+                <div id="loadingPrices" style="display:none; color:var(--primary); margin-bottom:10px; font-weight:600;">
+                    Cargando lista de precios desde Google Sheets...
+                </div>
+
                 <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                    <input type="text" id="newItemDesc" class="form-control" style="flex:3; min-width:200px;" placeholder="Descripción del producto">
+                    <div style="flex:3; min-width:250px; position:relative;">
+                        <input type="text" id="newItemDesc" class="form-control" list="productsList" placeholder="Buscar producto por código o nombre..." autocomplete="off">
+                        <datalist id="productsList"></datalist>
+                    </div>
+                    
                     <input type="number" id="newItemQty" class="form-control" style="flex:1; min-width:80px;" placeholder="Cant." value="1" min="1">
-                    <input type="number" id="newItemPrice" class="form-control" style="flex:1; min-width:100px;" placeholder="Precio Unit." min="0" step="0.01">
+                    
+                    <div style="flex:1; min-width:120px; display:flex; flex-direction:column; gap:2px;">
+                         <input type="number" id="newItemPrice" class="form-control" placeholder="Precio Unit." min="0" step="0.01">
+                         <span id="priceHint" style="font-size:0.75rem; color:#64748b; text-align:right;"></span>
+                    </div>
+
                     <button id="addItemBtn" class="btn-add">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Agregar
                     </button>
@@ -322,6 +353,7 @@
 
         // State
         let items = [];
+        let priceList = []; // Array of {cve, desc, prices:{blanco,electro,inox,hueso,madera}}
 
         // Elements
         const descInput = document.getElementById('newItemDesc');
@@ -329,6 +361,144 @@
         const priceInput = document.getElementById('newItemPrice');
         const itemsContainer = document.getElementById('itemsContainer');
         const emptyMsg = document.getElementById('emptyMsg');
+        const btnReload = document.getElementById('btnReloadPrices');
+        const loadingDiv = document.getElementById('loadingPrices');
+        const productsList = document.getElementById('productsList');
+        const finishSel = document.getElementById('globalFinish');
+        const priceHint = document.getElementById('priceHint');
+
+        // --- Google Sheets Integration ---
+        const SHEET_ID = '1hPFGd4BtTINl5fDyV3Gq8EBxlFDfY1mHjBFFvcNJ5a8';
+        const GVIZ_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`;
+
+        // Simple CSV Parser (handles quoted fields)
+        function parseCSV(text) {
+            const rows = [];
+            let currentRow = [];
+            let currentField = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                const nextChar = text[i+1];
+                
+                if (char === '"') {
+                    if (inQuotes && nextChar === '"') {
+                        currentField += '"';
+                        i++; // skip escaped quote
+                    } else {
+                        inQuotes = !inQuotes;
+        if(btnReload) btnReload.addEventListener('click', loadPrices);
+        
+        // Initial load
+        loadPrices();
+
+                    }
+                } else if (char === ',' && !inQuotes) {
+                    currentRow.push(currentField);
+                    currentField = '';
+                } else if ((char === '\r' || char === '\n') && !inQuotes) {
+                    if (char === '\r' && nextChar === '\n') i++;
+                    currentRow.push(currentField);
+                    rows.push(currentRow);
+                    currentRow = [];
+                    currentField = '';
+                } else {
+                    currentField += char;
+                }
+            }
+            if(currentField || currentRow.length > 0) {
+                 currentRow.push(currentField);
+                 rows.push(currentRow);
+            }
+            return rows;
+        }
+
+        function cleanPrice(str){
+            if(!str) return 0;
+            // Remove "$", ",", etc.
+            return parseFloat(str.replace(/[^0-9.-]/g, '')) || 0;
+        }
+
+        async function loadPrices(){
+            try {
+                loadingDiv.style.display = 'block';
+                const res = await fetch(GVIZ_URL);
+                if(!res.ok) throw new Error('Error fetching sheet');
+                const txt = await res.text();
+                const rows = parseCSV(txt);
+                
+                priceList = [];
+                
+                // Scan rows for valid products (heuristic: have CVE at idx 0 and Prices at idx 4 starting with $)
+                rows.forEach(r => {
+                    if(r.length < 9) return;
+                    const cve = r[0].trim();
+                    const desc = r[1].trim();
+                    // Indices logic based on inspection:
+                    // 4: Blanco ($), 5: Electro ($), 6: Inox ($), 7: Hueso ($), 8: Madera ($)
+                    
+                    // Simple validation: CVE not empty, and at least one price column has a "$"
+                    const p1 = r[4];
+                    
+                    // Filter headers or empty lines
+                    if(!cve || cve.toLowerCase() === 'cve' || !p1 || !p1.includes('$')) return;
+
+                    priceList.push({
+                        cve: cve,
+                        desc: desc,
+                        fullText: `${cve} - ${desc}`,
+                        prices: {
+                            blanco: cleanPrice(r[4]),
+                            electro: cleanPrice(r[5]),
+                            inox: cleanPrice(r[6]),
+                            hueso: cleanPrice(r[7]),
+                            madera: cleanPrice(r[8])
+                        }
+                    });
+                });
+
+                console.log(`Loaded ${priceList.length} products from Sheet.`);
+                populateDatalist();
+                
+            } catch(e){
+                console.error(e);
+                alert('No se pudo cargar la lista de precios. Verifique conexión.');
+            } finally {
+                loadingDiv.style.display = 'none';
+            }
+        }
+
+        function populateDatalist(){
+            productsList.innerHTML = '';
+            // Limit output to avoid crashing DOM if list is huge
+            const max = 2000;
+            priceList.slice(0, max).forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.fullText;
+                productsList.appendChild(opt);
+            });
+        }
+
+        // Auto-fill price on selection
+        descInput.addEventListener('input', (e) => {
+             const val = e.target.value;
+             // Try to find match
+             const match = priceList.find(p => p.fullText === val || p.cve === val || p.desc === val);
+             
+             if(match) {
+                 const finish = finishSel.value || 'blanco';
+                 const price = match.prices[finish];
+                 priceInput.value = price;
+                 priceHint.innerText = `Precio ${finish}: $${price.toFixed(2)}`;
+                 
+                 // Flash effect
+                 priceInput.style.backgroundColor = '#dcfce7';
+                 setTimeout(()=> priceInput.style.backgroundColor = '', 500);
+             } else {
+                 priceHint.innerText = '';
+             }
+        });
 
         // Add Item Logic
         document.getElementById('addItemBtn').addEventListener('click', () => {
