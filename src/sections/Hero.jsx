@@ -3,22 +3,31 @@ import { ArrowRight } from 'lucide-react';
 import './Hero.css';
 
 const Hero = () => {
+    const bgRef = useRef(null);
     const clients = ["FORD", "GM", "KIA", "CFE", "ULSA", "CROWNE PLAZA"];
-    const heroRef = useRef(null);
 
     useEffect(() => {
+        let ticking = false;
         const handleScroll = () => {
-            if (heroRef.current) {
-                const scrolled = window.scrollY;
-                heroRef.current.style.backgroundPositionY = `${scrolled * 0.5}px`;
+            if (!ticking) {
+                window.requestAnimationFrame(() => {
+                    if (bgRef.current) {
+                        const scrolled = window.scrollY;
+                        // Use translate3d for hardware acceleration
+                        bgRef.current.style.transform = `translate3d(0, ${scrolled * 0.4}px, 0)`;
+                    }
+                    ticking = false;
+                });
+                ticking = true;
             }
         };
-        window.addEventListener('scroll', handleScroll);
+        window.addEventListener('scroll', handleScroll, { passive: true });
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
     return (
-        <section id="inicio" className="hero" ref={heroRef}>
+        <section id="inicio" className="hero">
+            <div className="hero-bg-wrapper" ref={bgRef}></div>
             <div className="hero-grid-pattern"></div>
             <div className="hero-overlay"></div>
 
